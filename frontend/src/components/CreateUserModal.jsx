@@ -1,9 +1,10 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
-export default function CreateUserModal({ open, onClose, onCreate, role }) {
-  const [username, setUsername] = useState("");
+export default function CreateUserModal({ open, onClose, onCreate, role, fetchAccounts }) {
+  const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [officeUnit, setOfficeUnit] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -16,85 +17,123 @@ export default function CreateUserModal({ open, onClose, onCreate, role }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef();
 
-  if (!open) return null;
+  // Office unit options sorted alphabetically
+  const officeUnitOptions = [
+    "DOST-Ilocos Norte",
+    "DOST-Ilocos Sur FO",
+    "DOST-Ilocos Sur Main",
+    "DOST-La Union NEW",
+    "DOST-La Union OLD",
+    "DOST-Pangasinan FO",
+    "DOST-Pangasinan MAIN",
+    "Regional Office",
+    "RSTL"
+  ];
+
+  useEffect(() => {
+  if (open) {
+    setSuccess("");
+    setError("");
+  }
+}, [open]);
+
+if (!open) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
-    let profilePicFilename = null;
-    if (!username || !password || !confirmPassword) {
-      setError("Username, password, and confirm password are required.");
+    
+    if (!email || !password || !confirmPassword) {
+      setError("Email, password, and confirm password are required.");
       return;
     }
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
-    // Call parent handler to create user first
-    const result = await onCreate({
-      username,
-      password,
-      role, // Use the current role state
-      first_name: firstName,
-      last_name: lastName
-      // Don't send profile_picture yet
-    });
-    if (result && result.success && result.id && profilePicFile) {
-      // Upload profile picture with admin token and userId
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('profile_picture', profilePicFile);
-      formData.append('userId', result.id); // Use new user's id
-      try {
-        const uploadRes = await fetch('http://localhost:5000/api/auth/upload-profile-picture', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}` // Use admin token
-          },
-          body: formData
-        });
-        const uploadData = await uploadRes.json();
-        setUploading(false);
-        if (uploadData && uploadData.success && uploadData.filename) {
-          profilePicFilename = uploadData.filename;
-        } else {
-          setError(uploadData.message || 'Failed to upload profile picture.');
+    if (!officeUnit) {
+      setError("Please select an Office/Unit.");
+      return;
+    }
+    
+    try {
+      let profilePicFilename = null;
+      
+      // If there's a profile picture, upload it first
+      if (profilePicFile) {
+        setUploading(true);
+        const formData = new FormData();
+        formData.append('profile_picture', profilePicFile);
+        // No userId since user does not exist yet
+        try {
+          const uploadRes = await fetch('http://localhost:5000/api/auth/upload-profile-picture', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: formData
+          });
+          const uploadData = await uploadRes.json();
+          setUploading(false);
+          if (uploadData && uploadData.success && uploadData.filename) {
+            profilePicFilename = uploadData.filename;
+          } else {
+            setError(uploadData.message || 'Failed to upload profile picture.');
+            return;
+          }
+        } catch (err) {
+          setUploading(false);
+          setError('Failed to upload profile picture.');
           return;
         }
-      } catch (err) {
-        setUploading(false);
-        setError('Failed to upload profile picture.');
-        return;
       }
-    }
-    if (result && result.success) {
-      const accountType = role === 'admin' ? 'Admin' : 'User';
-      setSuccess(`${accountType} account "${username}" was created successfully!`);
-      // Clear form fields
-      setUsername("");
-      setPassword("");
-      setConfirmPassword("");
-      setFirstName("");
-      setLastName("");
-      setProfilePicFile(null);
-      setProfilePicPreview('/images/default-profile.jpg');
-      // Close modal after a delay
-      setTimeout(() => onClose(), 1500);
-    } else {
-      // Handle specific error messages
-      if (result && result.message) {
-        if (result.message.includes('Username already exists')) {
-          setError(`The username "${username}" already exists. Please choose a different username.`);
-        } else {
-          setError(result.message);
-        }
+      
+      // Create the user with the profile picture filename if available
+      const result = await onCreate({
+        email,
+        password,
+        role,
+        first_name: firstName,
+        last_name: lastName,
+        office_unit: officeUnit,
+        profile_picture: profilePicFilename
+      });
+      
+      if (result && result.success) {
+        const accountType = role === 'admin' ? 'Admin' : 'User';
+        setSuccess(`${accountType} account "${email}" was created successfully!`);
+        // Clear form fields
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+        setFirstName("");
+        setLastName("");
+        setOfficeUnit("");
+        setProfilePicFile(null);
+        setProfilePicPreview('/images/default-profile.jpg');
+        // Close modal after a delay
+        setTimeout(() => {
+  if (typeof fetchAccounts === 'function') fetchAccounts();
+  onClose();
+}, 1500);
       } else {
-        setError("Failed to create user account. Please try again.");
+        // Handle specific error messages
+        if (result && result.message) {
+          if (result.message.includes('Email already exists')) {
+            setError(`The email "${email}" already exists. Please choose a different email.`);
+          } else {
+            setError(result.message);
+          }
+        } else {
+          setError("Failed to create user account. Please try again.");
+        }
       }
+    } catch (error) {
+      console.error("Error creating account:", error);
+      setError("An unexpected error occurred. Please try again.");
     }
   };
-
 
   // Handle file input change for profile picture
   const handleProfilePicChange = (e) => {
@@ -186,11 +225,11 @@ export default function CreateUserModal({ open, onClose, onCreate, role }) {
             )}
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               required
             />
           </div>
@@ -210,6 +249,20 @@ export default function CreateUserModal({ open, onClose, onCreate, role }) {
               value={lastName}
               onChange={e => setLastName(e.target.value)}
             />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Office/Unit</label>
+            <select
+              className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+              value={officeUnit}
+              onChange={e => setOfficeUnit(e.target.value)}
+              required
+            >
+              <option value="">Select Office/Unit</option>
+              {officeUnitOptions.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -314,21 +367,24 @@ export default function CreateUserModal({ open, onClose, onCreate, role }) {
               )}
             </div>
           )}
-          <div className="flex justify-end gap-2 mt-4">
-            <button
-              type="button"
-              className="px-5 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 font-semibold transition-colors"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold transition-colors"
-            >
-              Create
-            </button>
-          </div>
+          {/* Only show buttons if there is NO success message */}
+          {!success && (
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                className="px-5 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 font-semibold transition-colors"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold transition-colors"
+              >
+                Create
+              </button>
+            </div>
+          )}
         </form>
         <button
           className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold focus:outline-none"

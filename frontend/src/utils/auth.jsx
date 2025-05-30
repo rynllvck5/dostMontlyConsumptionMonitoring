@@ -49,7 +49,7 @@ export const showSessionExpiredModal = () => {
     // Clear auth data
     localStorage.removeItem('token');
     localStorage.removeItem('role');
-    localStorage.removeItem('username');
+    localStorage.removeItem('email');
     localStorage.removeItem('userId');
     
     // Remove the modal from DOM
@@ -92,7 +92,8 @@ export const validateToken = async () => {
   
   try {
     // Use the dedicated endpoint for token validation
-    const res = await fetch('http://localhost:5000/api/auth/validate-token', {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+    const res = await fetch(`${API_URL}/validate-token`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     

@@ -3,9 +3,11 @@ import { handleTokenError } from "../utils/auth.jsx";
 
 // ProfileModal styled for modern modal UX
 export default function ProfileModal({ user, open, onClose }) {
-  const [username, setUsername] = useState(user.username || "");
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api/auth";
+  const [email, setEmail] = useState(user.email || "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [officeUnit, setOfficeUnit] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,6 +24,19 @@ export default function ProfileModal({ user, open, onClose }) {
   const [resetError, setResetError] = useState("");
   const fileInputRef = useRef();
 
+  // Office unit options sorted alphabetically
+  const officeUnitOptions = [
+    "DOST-Ilocos Norte",
+    "DOST-Ilocos Sur FO",
+    "DOST-Ilocos Sur Main",
+    "DOST-La Union NEW",
+    "DOST-La Union OLD",
+    "DOST-Pangasinan FO",
+    "DOST-Pangasinan MAIN",
+    "Regional Office",
+    "RSTL"
+  ];
+
   // Fetch user profile data
   useEffect(() => {
     if (!open) return;
@@ -32,7 +47,8 @@ export default function ProfileModal({ user, open, onClose }) {
         const token = localStorage.getItem("token");
         if (!token) return;
         
-        const response = await fetch("http://localhost:5000/api/auth/profile", {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+        const response = await fetch(`${API_URL}/profile`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -40,9 +56,10 @@ export default function ProfileModal({ user, open, onClose }) {
         
         if (response.ok) {
           const userData = await response.json();
-          setUsername(userData.username || "");
+          setEmail(userData.email || "");
           setFirstName(userData.first_name || "");
           setLastName(userData.last_name || "");
+          setOfficeUnit(userData.office_unit || "");
           
           if (userData.profile_picture) {
             setProfilePicture(`/images/${userData.profile_picture}`);
@@ -92,6 +109,12 @@ export default function ProfileModal({ user, open, onClose }) {
       }
     }
 
+    if (!officeUnit) {
+      setError("Please select an Office/Unit");
+      setSaving(false);
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -105,6 +128,7 @@ export default function ProfileModal({ user, open, onClose }) {
       if (profilePicFile) {
         const formData = new FormData();
         formData.append("profile_picture", profilePicFile);
+        formData.append("userId", user.id);
         
         const uploadRes = await fetch("http://localhost:5000/api/auth/upload-profile-picture", {
           method: "POST",
@@ -127,9 +151,10 @@ export default function ProfileModal({ user, open, onClose }) {
 
       // Then update profile details
       const updateData = {
-        username: username,
+        email: email,
         first_name: firstName,
-        last_name: lastName
+        last_name: lastName,
+        office_unit: officeUnit
       };
 
       if (newPassword) {
@@ -141,7 +166,7 @@ export default function ProfileModal({ user, open, onClose }) {
         updateData.profile_picture = newProfilePicFilename;
       }
 
-      const updateRes = await fetch("http://localhost:5000/api/auth/profile", {
+      const updateRes = await fetch(`${API_URL}/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -216,12 +241,12 @@ export default function ProfileModal({ user, open, onClose }) {
             </div>
             
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
                 className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
               />
             </div>
             
@@ -243,6 +268,22 @@ export default function ProfileModal({ user, open, onClose }) {
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Enter your last name"
               />
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Office/Unit</label>
+              <select
+                className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={officeUnit}
+                onChange={(e) => setOfficeUnit(e.target.value)}
+              >
+                <option value="">Select an Office/Unit</option>
+                {officeUnitOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </div>
             
             <div className="border-t border-gray-200 my-6 pt-6">

@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { login } from './api';
+import styles from './Login.module.css';
+import logo from './logo.svg';
+import BlueMeshGradient from './BlueMeshGradient';
 
 export default function Login({ onLogin }) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const res = await login(username, password);
+    const res = await login(email, password);
     if (res.token) {
       onLogin(res.token, res.role);
     } else {
@@ -18,33 +21,37 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-200">
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold text-blue-900 mb-6 text-center">Login</h2>
-        {error && <div className="bg-red-100 text-red-700 px-4 py-2 rounded mb-4 text-center">{error}</div>}
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            required
-            className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+    <BlueMeshGradient>
+      <div className={styles.loginCard}>
+        <div className={styles.leftPane}>
+          <img src="/images/logo.svg" alt="System Logo" className={styles.logo} />
+          <div className={styles.systemTitle}>Fuelectric Monitoring</div>
         </div>
-        <div className="mb-6">
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+        <div className={styles.rightPane}>
+          <img src="/images/logo.svg"  alt="Login Logo" className={styles.loginLogo} />
+          <div className={styles.loginTitle}>Login</div>
+          {error && <div className={styles.errorMsg}>{error}</div>}
+          <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              className={styles.loginInput}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              className={styles.loginInput}
+            />
+            <button type="submit" className={styles.loginButton}>Login</button>
+          </form>
         </div>
-        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded transition-colors">Login</button>
-
-      </form>
-    </div>
+      </div>
+    </BlueMeshGradient>
   );
 }

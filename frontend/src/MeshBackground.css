@@ -1,0 +1,15 @@
+.mesh-bg-wrapper {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mesh-bg-svg {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}

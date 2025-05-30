@@ -8,31 +8,37 @@ const router = express.Router();
 
 // Signup route (only for regular users)
 router.post('/signup', async (req, res) => {
-  const { username, password, profile_picture } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Username and password required.' });
+  const { email, password, profile_picture, first_name, last_name, office_unit } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password required.' });
   }
-  // Prevent duplicate usernames
-  const existing = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+  // Prevent duplicate emails
+  const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
   if (existing.rows.length > 0) {
-    return res.status(409).json({ message: 'Username already exists.' });
+    return res.status(409).json({ message: 'Email already exists.' });
   }
   const hashed = await bcrypt.hash(password, 10);
   const profilePic = profile_picture || 'default-profile.jpg';
-  await pool.query(
-    'INSERT INTO users (username, password, role, profile_picture) VALUES ($1, $2, $3, $4)',
-    [username, hashed, ROLES.USER, profilePic]
-  );
-  res.status(201).json({ message: 'User registered successfully.' });
+  
+  try {
+    await pool.query(
+      'INSERT INTO users (email, password, role, first_name, last_name, profile_picture, office_unit) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [email, hashed, ROLES.USER, first_name || '', last_name || '', profilePic, office_unit || '']
+    );
+    res.status(201).json({ success: true, message: 'User registered successfully.' });
+  } catch (err) {
+    console.error('Error creating user:', err);
+    res.status(500).json({ success: false, message: 'Server error. Failed to create user.' });
+  }
 });
 
 // Login route
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Username and password required.' });
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password required.' });
   }
-  const userRes = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+  const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
   if (userRes.rows.length === 0) {
     return res.status(401).json({ message: 'Invalid credentials.' });
   }
@@ -42,7 +48,7 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ message: 'Invalid credentials.' });
   }
   const token = jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
+    { id: user.id, email: user.email, role: user.role },
     process.env.JWT_SECRET,
     { expiresIn: '8h' } // Increased to 8 hours for better user experience
   );
@@ -62,14 +68,19 @@ function authenticateJWT(req, res, next) {
   });
 }
 
+export { authenticateJWT };
+
 // Admin/superadmin creates user or admin
 router.post('/create-user', authenticateJWT, async (req, res) => {
-  const { username, password, role, first_name, last_name, profile_picture } = req.body;
-  if (/\s/.test(username)) {
-    return res.status(400).json({ message: 'Username must not contain spaces.' });
+  const { email, password, role, first_name, last_name, profile_picture, office_unit } = req.body;
+  if (/\s/.test(email)) {
+    return res.status(400).json({ message: 'Email must not contain spaces.' });
   }
-  if (!username || !password || !role) {
-    return res.status(400).json({ message: 'Username, password, and role are required.' });
+  if (!email || !password || !role) {
+    return res.status(400).json({ message: 'Email, password, and role are required.' });
+  }
+  if (!office_unit) {
+    return res.status(400).json({ message: 'Office/Unit is required.' });
   }
   // Only superadmin can create admins, admin can only create users
   if (req.user.role === ROLES.ADMIN && role !== ROLES.USER) {
@@ -78,28 +89,39 @@ router.post('/create-user', authenticateJWT, async (req, res) => {
   if (req.user.role !== ROLES.SUPERADMIN && req.user.role !== ROLES.ADMIN) {
     return res.status(403).json({ message: 'Only admins or superadmins can create users.' });
   }
-  // Prevent duplicate usernames within the same role
-  const existing = await pool.query('SELECT * FROM users WHERE username = $1 AND role = $2', [username, role]);
+  // Prevent duplicate emails within the same role
+  const existing = await pool.query('SELECT * FROM users WHERE email = $1 AND role = $2', [email, role]);
   if (existing.rows.length > 0) {
-    return res.status(409).json({ message: `Username "${username}" already exists for ${role} accounts. Please choose a different username.` });
+    return res.status(409).json({ message: `Email "${email}" already exists for ${role} accounts. Please choose a different email.` });
   }
   const hashed = await bcrypt.hash(password, 10);
   const profilePic = profile_picture || 'default-profile.jpg';
-  await pool.query(
-    'INSERT INTO users (username, password, role, first_name, last_name, profile_picture) VALUES ($1, $2, $3, $4, $5, $6)',
-    [username, hashed, role, first_name || '', last_name || '', profilePic]
-  );
-  res.status(201).json({ success: true, message: 'User created successfully.' });
+  
+  try {
+    const result = await pool.query(
+      'INSERT INTO users (email, password, role, first_name, last_name, profile_picture, office_unit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      [email, hashed, role, first_name || '', last_name || '', profilePic, office_unit]
+    );
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'User created successfully.',
+      id: result.rows[0].id
+    });
+  } catch (err) {
+    console.error('Error creating user:', err);
+    res.status(500).json({ success: false, message: 'Server error. Failed to create user.' });
+  }
 });
 
-// Check if username exists for a given role
-router.get('/check-username', async (req, res) => {
-  const { username, role } = req.query;
-  if (!username || !role) {
-    return res.status(400).json({ exists: false, error: 'Missing username or role' });
+// Check if email exists for a given role
+router.get('/check-email', async (req, res) => {
+  const { email, role } = req.query;
+  if (!email || !role) {
+    return res.status(400).json({ exists: false, error: 'Missing email or role' });
   }
   try {
-    const existing = await pool.query('SELECT * FROM users WHERE username = $1 AND role = $2', [username, role]);
+    const existing = await pool.query('SELECT * FROM users WHERE email = $1 AND role = $2', [email, role]);
     res.json({ exists: existing.rows.length > 0 });
   } catch (err) {
     res.status(500).json({ exists: false, error: 'Server error' });
@@ -117,7 +139,7 @@ router.get('/accounts', authenticateJWT, async (req, res) => {
     return res.status(400).json({ message: 'Role must be user or admin.' });
   }
   try {
-    const results = await pool.query('SELECT id, username, role, first_name, last_name, profile_picture FROM users WHERE role = $1 ORDER BY username', [role]);
+    const results = await pool.query('SELECT id, email, role, first_name, last_name, profile_picture, office_unit FROM users WHERE role = $1 ORDER BY email', [role]);
     res.json(results.rows);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -133,11 +155,11 @@ router.put('/account/:id', authenticateJWT, async (req, res) => {
     id = req.user.id;
   }
   
-  const { username, password, currentPassword, first_name, last_name, profile_picture } = req.body;
-  if (username && /\s/.test(username)) {
-    return res.status(400).json({ message: 'Username must not contain spaces.' });
+  const { email, password, currentPassword, first_name, last_name, profile_picture, office_unit } = req.body;
+  if (email && /\s/.test(email)) {
+    return res.status(400).json({ message: 'Email must not contain spaces.' });
   }
-  if (!username && !password && !first_name && !last_name && !profile_picture) {
+  if (!email && !password && !first_name && !last_name && !profile_picture && !office_unit) {
     return res.status(400).json({ message: 'Nothing to update.' });
   }
   try {
@@ -160,13 +182,17 @@ router.put('/account/:id', authenticateJWT, async (req, res) => {
     if (first_name !== undefined || last_name !== undefined) {
       await pool.query('UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3', [first_name || '', last_name || '', id]);
     }
-    if (username) {
-      // Check if the username already exists for a different account
-      const existingUser = await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [username, id]);
+    // Update office_unit if provided
+    if (office_unit !== undefined) {
+      await pool.query('UPDATE users SET office_unit = $1 WHERE id = $2', [office_unit, id]);
+    }
+    if (email) {
+      // Check if the email already exists for a different account
+      const existingUser = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, id]);
       if (existingUser.rows.length > 0) {
-        return res.status(409).json({ message: 'Username already exists. Please choose a different username.' });
+        return res.status(409).json({ message: 'Email already exists. Please choose a different email.' });
       }
-      await pool.query('UPDATE users SET username = $1 WHERE id = $2', [username, id]);
+      await pool.query('UPDATE users SET email = $1 WHERE id = $2', [email, id]);
     }
     if (profile_picture) {
       await pool.query('UPDATE users SET profile_picture = $1 WHERE id = $2', [profile_picture, id]);
@@ -205,7 +231,7 @@ router.delete('/account/:id', authenticateJWT, async (req, res) => {
   const { id } = req.params;
   try {
     // Get account info before deleting
-    const accountRes = await pool.query('SELECT username, role FROM users WHERE id = $1', [id]);
+    const accountRes = await pool.query('SELECT email, role FROM users WHERE id = $1', [id]);
     if (accountRes.rows.length === 0) {
       return res.status(404).json({ message: 'Account not found' });
     }
@@ -215,7 +241,7 @@ router.delete('/account/:id', authenticateJWT, async (req, res) => {
     
     res.json({ 
       success: true, 
-      message: `Account "${account.username}" has been deleted successfully.`
+      message: `Account "${account.email}" has been deleted successfully.`
     });
   } catch (err) {
     console.error('Error deleting account:', err);
@@ -243,7 +269,7 @@ router.get('/profile', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
     const result = await pool.query(
-      'SELECT id, username, role, first_name, last_name, profile_picture FROM users WHERE id = $1',
+      'SELECT id, email, role, first_name, last_name, profile_picture, office_unit FROM users WHERE id = $1',
       [userId]
     );
     
@@ -262,10 +288,10 @@ router.get('/profile', authenticateJWT, async (req, res) => {
 router.put('/profile', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { username, first_name, last_name, password, currentPassword, profile_picture } = req.body;
+    const { email, first_name, last_name, password, currentPassword, profile_picture, office_unit } = req.body;
     
     // Check if there's anything to update
-    if (!username && !first_name && !last_name && !password && !profile_picture) {
+    if (!email && !first_name && !last_name && !password && !profile_picture && !office_unit) {
       return res.status(400).json({ message: 'Nothing to update' });
     }
     
@@ -291,14 +317,14 @@ router.put('/profile', authenticateJWT, async (req, res) => {
       await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
     }
     
-    // Update username if provided
-    if (username) {
-      // Check if the username already exists for a different account
-      const existingUser = await pool.query('SELECT id FROM users WHERE username = $1 AND id != $2', [username, userId]);
+    // Update email if provided
+    if (email) {
+      // Check if the email already exists for a different account
+      const existingUser = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, userId]);
       if (existingUser.rows.length > 0) {
-        return res.status(409).json({ message: 'Username already exists. Please choose a different username.' });
+        return res.status(409).json({ message: 'Email already exists. Please choose a different email.' });
       }
-      await pool.query('UPDATE users SET username = $1 WHERE id = $2', [username, userId]);
+      await pool.query('UPDATE users SET email = $1 WHERE id = $2', [email, userId]);
     }
     
     // Update name fields if provided
@@ -307,6 +333,11 @@ router.put('/profile', authenticateJWT, async (req, res) => {
         'UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3',
         [first_name || '', last_name || '', userId]
       );
+    }
+    
+    // Update office_unit if provided
+    if (office_unit !== undefined) {
+      await pool.query('UPDATE users SET office_unit = $1 WHERE id = $2', [office_unit, userId]);
     }
     
     // Update profile picture if provided
@@ -358,7 +389,7 @@ router.get('/validate-token', authenticateJWT, async (req, res) => {
       valid: true, 
       user: {
         id: req.user.id,
-        username: req.user.username,
+        email: req.user.email,
         role: req.user.role
       }
     });
@@ -373,17 +404,24 @@ router.post('/upload-profile-picture', authenticateJWT, upload.single('profile_p
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded.' });
   }
-  let userId = req.user.id;
-  // Allow admin/superadmin to specify userId to upload for another user
-  if ((req.user.role === 'admin' || req.user.role === 'superadmin') && req.body.userId) {
-    userId = req.body.userId;
-  }
-  const filename = req.file.filename;
-  try {
-    await pool.query('UPDATE users SET profile_picture = $1 WHERE id = $2', [filename, userId]);
-    res.json({ success: true, filename });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
+
+  // If userId is provided and the logged-in user is admin/superadmin, update that user's profile_picture
+  if (req.body.userId) {
+    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+      const userId = req.body.userId;
+      const filename = req.file.filename;
+      try {
+        await pool.query('UPDATE users SET profile_picture = $1 WHERE id = $2', [filename, userId]);
+        return res.json({ success: true, filename });
+      } catch (err) {
+        return res.status(500).json({ message: 'Server error' });
+      }
+    } else {
+      return res.status(403).json({ message: 'Not authorized to upload for another user.' });
+    }
+  } else {
+    // No userId: just return the filename, do NOT update any user
+    return res.json({ success: true, filename: req.file.filename });
   }
 });
 

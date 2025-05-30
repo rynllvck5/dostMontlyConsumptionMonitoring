@@ -5,9 +5,10 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
   console.log('Edit account data:', account);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [username, setUsername] = useState(account.username);
+  const [email, setEmail] = useState(account.email);
   const [firstName, setFirstName] = useState(account.first_name || '');
   const [lastName, setLastName] = useState(account.last_name || '');
+  const [officeUnit, setOfficeUnit] = useState(account.office_unit || '');
   const [password, setPassword] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,15 +25,31 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef();
 
+  // Office unit options sorted alphabetically
+  const officeUnitOptions = [
+    "DOST-Ilocos Norte",
+    "DOST-Ilocos Sur FO",
+    "DOST-Ilocos Sur Main",
+    "DOST-La Union NEW",
+    "DOST-La Union OLD",
+    "DOST-Pangasinan FO",
+    "DOST-Pangasinan MAIN",
+    "Regional Office",
+    "RSTL"
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     let newProfilePicFilename = null;
-    // Username validation: no spaces
-    if (/\s/.test(username)) {
-      setError('Username must not contain spaces.');
+    // Email validation: must be valid email format
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setError('A valid email is required.');
+      return;
+    }
+    if (!officeUnit) {
+      setError('Please select an Office/Unit.');
       return;
     }
     try {
@@ -41,7 +58,12 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
         setUploading(true);
         const formData = new FormData();
         formData.append('profile_picture', profilePicFile);
-        const uploadRes = await fetch('http://localhost:5000/api/auth/upload-profile-picture', {
+        // Always include userId for admin/superadmin edits
+        if (account && account.id) {
+          formData.append('userId', account.id);
+        }
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+        const uploadRes = await fetch(`${API_URL}/upload-profile-picture`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -65,9 +87,10 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          username,
+          email,
           first_name: firstName,
           last_name: lastName,
+          office_unit: officeUnit,
           password: password || undefined,
           currentPassword: (account.role === 'user' && editorRole === 'user') ? currentPassword : undefined,
           profile_picture: newProfilePicFilename || undefined
@@ -77,12 +100,12 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
       if (data.success) {
         setPassword('');
         setCurrentPassword('');
-        setSuccess(`Account for ${username} was updated successfully.`);
+        setSuccess(`Account for ${email} was updated successfully.`);
         setTimeout(onClose, 1500);
       } else {
         // Handle specific error messages
-        if (data.message && data.message.includes('Username already exists')) {
-          setError(`The username "${username}" is already taken.`);
+        if (data.message && data.message.includes('Email already exists')) {
+          setError(`The email "${email}" is already taken.`);
         } else if (handleTokenError(data.message)) {
           // Token error is handled by the utility function
         } else {
@@ -104,7 +127,6 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
       setProfilePicPreview(URL.createObjectURL(file));
     }
   };
-
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
@@ -204,13 +226,27 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
             />
           </div>
           <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-1">Username</label>
+            <label className="block text-gray-700 font-medium mb-1">Email</label>
             <input
               type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+          <div className="mb-4">
+            <label className="block text-gray-700 font-medium mb-1">Office/Unit</label>
+            <select
+              className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              value={officeUnit}
+              onChange={e => setOfficeUnit(e.target.value)}
+              required
+            >
+              <option value="">Select Office/Unit</option>
+              {officeUnitOptions.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
           </div>
 
           {/* New Password section (single input for all roles) */}
@@ -253,30 +289,30 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
                         className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                         disabled={resetting}
                         onClick={async () => {
-                          setResetting(true);
-                          setError('');
-                          setSuccess('');
-                          try {
-                            const res = await fetch(`http://localhost:5000/api/auth/account/${account.id}/reset-password`, {
-                              method: 'POST',
-                              headers: {
-                                'Authorization': `Bearer ${token}`
-                              }
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                              const defaultPassword = account.role === 'admin' ? 'admin123' : 'userpassword';
-                              setSuccess(`Password has been reset to "${defaultPassword}"`);
-                            } else if (!handleTokenError(data.message)) {
-                              // Only set error if it's not a token error (which is already handled)
-                              setError(data.message || 'Failed to reset password.');
-                            }
-                          } catch (err) {
-                            setError('Failed to reset password.');
-                          }
-                          setResetting(false);
-                          setShowResetConfirm(false);
-                        }}
+  setResetting(true);
+  setError('');
+  setSuccess('');
+  try {
+    const res = await fetch(`http://localhost:5000/api/auth/account/${account.id}/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    const data = await res.json();
+    if (data.success) {
+      const defaultPassword = account.role === 'admin' ? 'admin123' : 'userpassword';
+      setSuccess(`Password has been reset to "${defaultPassword}"`);
+      setTimeout(onClose, 1500);
+    } else if (!handleTokenError(data.message)) {
+      setError(data.message || 'Failed to reset password.');
+    }
+  } catch (err) {
+    setError('Failed to reset password.');
+  }
+  setResetting(false);
+  setShowResetConfirm(false);
+}}
                       >Reset Password</button>
                     </div>
                   </div>
@@ -319,10 +355,13 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
             </div>
           )}
           
-          <div className="flex justify-end gap-2 mt-4">
-            <button type="button" className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 transition-colors" onClick={onClose}>Cancel</button>
-            <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors">Save</button>
-          </div>
+          {/* Only show buttons if there is NO success message */}
+          {!success && (
+            <div className="flex justify-end gap-2 mt-4">
+              <button type="button" className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 transition-colors" onClick={onClose}>Cancel</button>
+              <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors">Save</button>
+            </div>
+          )}
         </form>
       </div>
     </div>

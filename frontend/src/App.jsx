@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Login from './Login.jsx';
 // import Signup from './Signup.jsx';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import FuelConsumption from './FuelConsumption';
+import ElectricityConsumption from './ElectricityConsumption';
+import ConsumptionItemsSection from "./components/ConsumptionItemsSection";
 
 // Chevron button for mini-sidebar (right)
 const MiniSidebarButton = ({ onClick }) => (
@@ -35,30 +39,54 @@ import CreateUserModal from './components/CreateUserModal';
 import AccountList from './components/AccountList';
 
 
-function DashboardContent({ role, onOpenCreateUser }) {
+function DashboardContent({ role, onOpenCreateUser, onCardClick, view }) {
   const displayRole = role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User';
   return (
     <div>
-      <h2>Welcome, {displayRole}</h2>
-      {role === 'superadmin' && (
-        <div className="my-4">
-          <b>Superadmin Panel:</b> Manage all users and admins here.
-          <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold transition-colors" onClick={() => onOpenCreateUser('superadmin')}>
-            Create Admin/User
-          </button>
-        </div>
-      )}
-      {role === 'admin' && (
-        <div className="my-4">
-          <b>Admin Panel:</b> Manage regular users here.
-          <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold transition-colors" onClick={() => onOpenCreateUser('admin')}>
-            Create User
-          </button>
-        </div>
+      {view === 'home' && (
+        <>
+          <h2>Welcome, {displayRole}</h2>
+          {role === 'superadmin' && (
+            <div className="my-4">
+              <b>Superadmin Panel:</b> Manage all users and admins here.
+              <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold transition-colors" onClick={() => onOpenCreateUser('superadmin')}>
+                Create Admin/User
+              </button>
+            </div>
+          )}
+          {role === 'admin' && (
+            <div className="my-4">
+              <b>Admin Panel:</b> Manage users here.
+            </div>
+          )}
+          {!role && (
+            <div>
+              <span>General Dashboard</span>
+              <p>Welcome to your dashboard. Please log in to see more details.</p>
+            </div>
+          )}
+        </>
       )}
       {role === 'user' && (
-        <div>
-          <b>User Dashboard:</b> View your profile and data here.
+        <div className="flex flex-col items-center justify-center min-h-[50vh] w-full">
+          <div className="flex flex-col md:flex-row gap-8 w-full max-w-2xl justify-center items-center">
+            {/* Fuel Consumption Card */}
+            <button
+              className="bg-blue-100 shadow-lg rounded-xl p-8 flex-1 min-w-[260px] max-w-xs h-48 flex flex-col justify-start relative hover:shadow-xl hover:scale-105 transition-transform"
+              style={{ cursor: 'pointer' }}
+              onClick={() => onCardClick && onCardClick('fuel-consumption')}
+            >
+              <span className="text-lg font-semibold text-blue-900 absolute top-6 left-8">Fuel Consumption</span>
+            </button>
+            {/* Electricity Consumption Card */}
+            <button
+              className="bg-yellow-100 shadow-lg rounded-xl p-8 flex-1 min-w-[260px] max-w-xs h-48 flex flex-col justify-start relative hover:shadow-xl hover:scale-105 transition-transform"
+              style={{ cursor: 'pointer' }}
+              onClick={() => onCardClick && onCardClick('electricity-consumption')}
+            >
+              <span className="text-lg font-semibold text-yellow-900 absolute top-6 left-8">Electricity Consumption</span>
+            </button>
+          </div>
         </div>
       )}
       {!role && (
@@ -71,18 +99,88 @@ function DashboardContent({ role, onOpenCreateUser }) {
   );
 }
 
-function App() {
+function AppShell() {
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [createUserType, setCreateUserType] = useState(null);
   const [view, setView] = useState('login');
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [role, setRole] = useState(localStorage.getItem('role') || null);
-  const [username, setUsername] = useState(localStorage.getItem('username') || '');
+  const [email, setEmail] = useState(localStorage.getItem('email') || '');
+  const [firstName, setFirstName] = useState(localStorage.getItem('firstName') || '');
+  const [lastName, setLastName] = useState(localStorage.getItem('lastName') || '');
   const [userId, setUserId] = useState(localStorage.getItem('userId') || '');
   const [nav, setNav] = useState('dashboard');
   const [profileOpen, setProfileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768); // md breakpoint
+  const navigate = useNavigate();
+  const location = useLocation();
 
+  // Set the correct navigation state based on the current URL path
+  React.useEffect(() => {
+    const path = location.pathname;
+    if (path === '/') {
+      setNav('dashboard');
+    } else if (path === '/fuel-consumption') {
+      // For consumption pages, show both the dropdown and the selected item
+      if (role === 'user') {
+        // Set a special combined state for dropdown + selection
+        setNav('dropdown-fuel-consumption');
+      } else {
+        setNav('fuel-consumption');
+      }
+    } else if (path === '/electricity-consumption') {
+      if (role === 'user') {
+        // Set a special combined state for dropdown + selection
+        setNav('dropdown-electricity-consumption');
+      } else {
+        setNav('electricity-consumption');
+      }
+    } else if (path === '/electricity-consumption-main') {
+      setNav('electricity-consumption');
+    }
+  }, [location, role]);
+
+  // Navigation handler for sidebar and cards
+  const handleNav = (navKey) => {
+    // Set navigation state based on selected item
+    if (navKey === 'dashboard-dropdown') {
+      // Toggle dropdown when clicked
+      if (nav === 'dashboard-dropdown') {
+        setNav('');
+      } else if (nav === 'dropdown-fuel-consumption') {
+        setNav('fuel-consumption');
+      } else if (nav === 'dropdown-electricity-consumption') {
+        setNav('electricity-consumption');
+      } else {
+        setNav('dashboard-dropdown');
+      }
+      return; // Don't navigate
+    } else if (navKey === 'fuel-consumption') {
+      // For consumption items, we need to maintain dropdown state
+      setNav('dropdown-fuel-consumption');
+      navigate('/fuel-consumption');
+    } else if (navKey === 'electricity-consumption') {
+      // For consumption items, we need to maintain dropdown state
+      setNav('dropdown-electricity-consumption');
+      navigate('/electricity-consumption');
+    } else if (navKey === 'dashboard') {
+      setNav(navKey);
+      navigate('/');
+    } else if (navKey === 'electricity-consumption-main') {
+      setNav(navKey);
+      navigate('/electricity-consumption');
+    } else if (navKey === 'item-inventory') {
+      setNav('item-inventory');
+      navigate('/item-inventory');
+    } else {
+      // For other navigation items, close any open dropdown
+      setNav(navKey);
+    }
+  };
+
+  // ... (rest of the logic is unchanged)
+
+  
   // Responsive sidebar toggle
   React.useEffect(() => {
     const handleResize = () => {
@@ -119,13 +217,30 @@ function App() {
     }
   };
 
-  const handleLogin = (jwt, userRole) => {
+  const handleLogin = async (jwt, userRole) => {
     setToken(jwt);
     setRole(userRole);
     // For demo, let's just use the last logged in username
     const uname = window.sessionStorage.getItem('lastLoginUser') || '';
-    setUsername(uname);
-    
+    setEmail(uname);
+
+    // Fetch firstName and lastName from backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+      const res = await fetch(`${API_URL}/profile`, {
+        headers: { 'Authorization': `Bearer ${jwt}` }
+      });
+      if (res.ok) {
+        const userData = await res.json();
+        setFirstName(userData.first_name || '');
+        setLastName(userData.last_name || '');
+        localStorage.setItem('firstName', userData.first_name || '');
+        localStorage.setItem('lastName', userData.last_name || '');
+      }
+    } catch (e) {
+      setFirstName('');
+      setLastName('');
+    }
     // Get user ID from JWT token
     try {
       const tokenData = JSON.parse(atob(jwt.split('.')[1]));
@@ -136,88 +251,77 @@ function App() {
     } catch (e) {
       console.error('Failed to parse JWT token', e);
     }
-    
     localStorage.setItem('token', jwt);
     localStorage.setItem('role', userRole);
-    localStorage.setItem('username', uname);
+    localStorage.setItem('email', uname);
   };
   const handleLogout = () => {
     setToken(null);
     setRole(null);
-    setUsername('');
+    setEmail('');
+    setFirstName('');
+    setLastName('');
     setUserId('');
     localStorage.removeItem('token');
     localStorage.removeItem('role');
-    localStorage.removeItem('username');
+    localStorage.removeItem('email');
+    localStorage.removeItem('firstName');
+    localStorage.removeItem('lastName');
     localStorage.removeItem('userId');
     setView('login');
   };
 
-  // Save username on login form submit
-  const handleLoginUsername = (uname) => {
+  // On mount: if token, fetch profile for first/last name
+  React.useEffect(() => {
+    const fetchProfile = async () => {
+      if (token) {
+        try {
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+          const res = await fetch(`${API_URL}/profile`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const userData = await res.json();
+            setFirstName(userData.first_name || '');
+            setLastName(userData.last_name || '');
+            localStorage.setItem('firstName', userData.first_name || '');
+            localStorage.setItem('lastName', userData.last_name || '');
+          }
+        } catch (e) {
+          setFirstName('');
+          setLastName('');
+        }
+      }
+    };
+    fetchProfile();
+    // eslint-disable-next-line
+  }, [token]);
+
+  // Save email on login form submit
+  const handleLoginEmail = (mail) => {
     window.sessionStorage.setItem('lastLoginUser', uname);
   };
 
   if (token && role) {
+    // Compute full name for sidebar
+    const fullName = (firstName || lastName) ? `${firstName} ${lastName}`.trim() : email;
     return (
       <div className="flex h-screen bg-gray-100 relative">
-        {/* Mini-sidebar: always visible when sidebar is closed */}
-        {/* Animated mini-sidebar: fade/slide in/out */}
-        {/* Morphing sidebar: animates width, content changes based on open state */}
-        <div
-          className={`fixed md:sticky left-0 top-0 z-50 h-full bg-gradient-to-b from-blue-900 to-blue-800 text-white flex flex-col shadow-2xl transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-12'} overflow-hidden`}
-        >
-          {/* Sidebar content morphs */}
-          {sidebarOpen ? (
-            <>
-              <SidebarCloseButton onClick={() => setSidebarOpen(false)} />
-              <div className="flex items-center gap-2 mb-10 px-2 mt-2">
-                <img src="/images/logo.png" alt="Logo" className="w-10 h-10" />
-                <h2 className="text-2xl font-bold tracking-wide">Monthly Consumption</h2>
-              </div>
-              <nav className="flex flex-col gap-2">
-                <button
-                  className={`text-left px-4 py-2 rounded transition-colors ${nav === 'dashboard' ? 'bg-blue-800' : 'hover:bg-blue-700'}`}
-                  onClick={() => setNav('dashboard')}
-                >
-                  Home
-                </button>
-                <button
-                  className={`text-left px-4 py-2 rounded transition-colors ${nav === 'profile' ? 'bg-blue-800' : 'hover:bg-blue-700'}`}
-                  onClick={() => setNav('profile')}
-                >
-                  Profile
-                </button>
-                {role === 'superadmin' && (
-                  <>
-                    <button className={`text-left px-4 py-2 rounded transition-colors ${nav === 'admin-management' ? 'bg-blue-800' : 'hover:bg-blue-700'}`}
-                      onClick={() => setNav('admin-management')}
-                    >
-                      Admin Management
-                    </button>
-                    <button className={`text-left px-4 py-2 rounded transition-colors ${nav === 'user-management' ? 'bg-blue-800' : 'hover:bg-blue-700'}`}
-                      onClick={() => setNav('user-management')}
-                    >
-                      User Management
-                    </button>
-                  </>
-                )}
-                {role === 'admin' && (
-                  <button className={`text-left px-4 py-2 rounded transition-colors ${nav === 'user-management' ? 'bg-blue-800' : 'hover:bg-blue-700'}`}
-                    onClick={() => setNav('user-management')}
-                  >
-                    User Management
-                  </button>
-                )}
-              </nav>
-            </>
-          ) : (
-            <MiniSidebarButton onClick={() => setSidebarOpen(true)} />
-          )}
-        </div>
+        {/* Only render a single Sidebar, which morphs between open and closed states */}
+        <Sidebar
+          role={role}
+          fullName={fullName}
+          onNav={handleNav}
+          selected={nav}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(!sidebarOpen)}
+          onLogout={handleLogout}
+        />
         <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300`}>
           <Header
-            username={username}
+            email={email}
+            firstName={firstName}
+            lastName={lastName}
             role={role}
             onProfileClick={() => {
               setNav('profile');
@@ -226,10 +330,16 @@ function App() {
             onLogout={handleLogout}
           />
           <main className="flex-1 overflow-auto">
-            {nav === 'dashboard' && <DashboardContent role={role} />}
+            <Routes>
+              <Route path="/" element={<DashboardContent role={role} onOpenCreateUser={setCreateUserOpen} onCardClick={handleNav} />} />
+              <Route path="/fuel-consumption" element={<FuelConsumption />} />
+              <Route path="/electricity-consumption" element={<ElectricityConsumption />} />
+              <Route path="/item-inventory" element={<ConsumptionItemsSection token={token} />} />
+            </Routes>
+
             {nav === 'profile' && (
               <ProfileModal
-                user={{ username, role, id: userId }}
+                user={{ email, role, id: userId }}
                 open={profileOpen}
                 onClose={() => setProfileOpen(false)}
               />
@@ -287,16 +397,19 @@ function App() {
           onClose={() => setCreateUserOpen(false)}
           isSuperadmin={createUserType === 'superadmin'}
           role={createUserType} 
-          onCreate={async ({ username, password }) => {
-            const { createUser, checkUsernameExists } = await import('./api');
+          onCreate={async (user) => {
+            if (!user) return { success: false, message: 'No user data provided.' };
+            const { email, password, first_name, last_name, profile_picture, office_unit } = user;
+            const { createUser, checkEmailExists } = await import('./api');
             const token = localStorage.getItem('token');
             if (!token) return { success: false, message: 'Not authenticated.' };
             // Check if username exists for this role
-            const check = await checkUsernameExists(username, createUserType);
+            const check = await checkEmailExists(email, createUserType);
             if (check.exists) {
-              return { success: false, message: `Username '${username}' already exists.` };
+              return { success: false, message: `Email '${email}' already exists.` };
             }
-            const result = await createUser({ username, password, role: createUserType, token });
+            // Pass all required fields including office_unit to the API
+            const result = await createUser({ email, password, role: createUserType, token, first_name, last_name, profile_picture, office_unit });
             return result;
           }}
         />
@@ -309,6 +422,14 @@ function App() {
   }
   // No other views supported now
   return null;
+}
+
+function App() {
+  return (
+    <Router>
+      <AppShell />
+    </Router>
+  );
 }
 
 export default App;

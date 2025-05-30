@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import EditAccountModal from './EditAccountModal';
 import CreateUserModal from './CreateUserModal';
 import { handleTokenError } from '../utils/auth.jsx';
+import { API_URL } from '../api';
 
 // ViewAccountModal component for displaying account details
 function ViewAccountModal({ account, onClose }) {
@@ -26,7 +27,7 @@ function ViewAccountModal({ account, onClose }) {
           <div className="relative mb-4">
             <img 
               src={account.profile_picture ? `/images/${account.profile_picture}` : '/images/default-profile.jpg'} 
-              alt={account.username}
+              alt={account.email}
               className="w-24 h-24 rounded-full object-cover border-2 border-blue-500"
               onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
             />
@@ -34,11 +35,16 @@ function ViewAccountModal({ account, onClose }) {
               {account.role}
             </div>
           </div>
-          <h4 className="text-lg font-bold text-gray-800">{account.username}</h4>
+          <h4 className="text-lg font-bold text-gray-800">{account.email}</h4>
           <p className="text-gray-600">
             {account.first_name || account.last_name ? 
               `${account.first_name || ''} ${account.last_name || ''}`.trim() : 
               'No name set'}
+          </p>
+          <p className="text-gray-600 mt-1">
+            {account.office_unit && account.office_unit.trim() !== '' ? 
+              account.office_unit : 
+              'No office/unit set'}
           </p>
         </div>
         
@@ -46,8 +52,8 @@ function ViewAccountModal({ account, onClose }) {
           <h5 className="text-sm font-semibold text-gray-700 mb-2">Account Information</h5>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-gray-500">Username</p>
-              <p className="text-sm font-medium">{account.username}</p>
+              <p className="text-xs text-gray-500">Email</p>
+              <p className="text-sm font-medium">{account.email}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Role</p>
@@ -60,6 +66,10 @@ function ViewAccountModal({ account, onClose }) {
             <div>
               <p className="text-xs text-gray-500">Last Name</p>
               <p className="text-sm font-medium">{account.last_name || 'Not set'}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-gray-500">Office/Unit</p>
+              <p className="text-sm font-medium">{account.office_unit && account.office_unit.trim() !== '' ? account.office_unit : 'Not set'}</p>
             </div>
           </div>
         </div>
@@ -99,11 +109,20 @@ export default function AccountList({ role, token, onCreateClick }) {
     setError('');
     
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/accounts?role=${role}`, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+    const res = await fetch(`${API_URL}/accounts?role=${role}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
       console.log('Fetched accounts:', data);
+      
+      // Add detailed debugging for office/unit field
+      if (Array.isArray(data) && data.length > 0) {
+        console.log('First account data:', data[0]);
+        console.log('Office/Unit value type:', typeof data[0].office_unit);
+        console.log('Office/Unit value:', data[0].office_unit);
+      }
+      
       const accountsList = Array.isArray(data) ? data : [];
       setAccounts(accountsList);
       setFilteredAccounts(accountsList);
@@ -127,12 +146,12 @@ export default function AccountList({ role, token, onCreateClick }) {
     
     const term = searchTerm.toLowerCase().trim();
     const filtered = accounts.filter(account => {
-      const username = account.username.toLowerCase();
+      const email = account.email.toLowerCase();
       const firstName = (account.first_name || '').toLowerCase();
       const lastName = (account.last_name || '').toLowerCase();
       const fullName = `${firstName} ${lastName}`.trim();
       
-      return username.includes(term) || 
+      return email.includes(term) || 
              firstName.includes(term) || 
              lastName.includes(term) || 
              fullName.includes(term);
@@ -153,7 +172,7 @@ export default function AccountList({ role, token, onCreateClick }) {
     setError('');
     
     try {
-      const res = await fetch(`http://localhost:5000/api/auth/account/${deleteAccount.id}`, {
+      const res = await fetch(`${API_URL}/account/${deleteAccount.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -161,7 +180,7 @@ export default function AccountList({ role, token, onCreateClick }) {
       const data = await res.json();
       
       if (data.success) {
-        setSuccess(data.message || `Account "${deleteAccount.username}" was deleted successfully.`);
+        setSuccess(data.message || `Account "${deleteAccount.email}" was deleted successfully.`);
       fetchAccounts();
         setTimeout(() => {
           setSuccess('');
@@ -201,7 +220,7 @@ export default function AccountList({ role, token, onCreateClick }) {
           </div>
           <input
             type="text"
-            placeholder={`Search ${role === 'admin' ? 'admins' : 'users'} by name or username...`}
+            placeholder={`Search ${role === 'admin' ? 'admins' : 'users'} by name or email...`}
             className="w-full py-2 px-2 outline-none"
             value={searchTerm}
             onChange={handleSearchChange}
@@ -260,9 +279,9 @@ export default function AccountList({ role, token, onCreateClick }) {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="w-16 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
-                  <th scope="col" className="w-1/4 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                  <th scope="col" className="w-1/3 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th scope="col" className="w-1/6 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                  <th scope="col" className="w-1/5 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th scope="col" className="w-1/5 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th scope="col" className="w-1/4 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Office/Unit</th>
                   <th scope="col" className="w-28 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -272,13 +291,13 @@ export default function AccountList({ role, token, onCreateClick }) {
                     <td className="px-3 py-3 whitespace-nowrap text-center">
                         <img 
                           src={acc.profile_picture ? `/images/${acc.profile_picture}` : '/images/default-profile.jpg'} 
-                          alt={acc.username}
+                          alt={acc.email}
                           className="w-10 h-10 rounded-full object-cover inline-block"
                           onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
                         />
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <div className="text-sm font-medium text-gray-900 truncate mx-auto max-w-full">{acc.username}</div>
+                      <div className="text-sm font-medium text-gray-900 truncate mx-auto max-w-full">{acc.email}</div>
                     </td>
                     <td className="px-3 py-3 text-center">
                       <div className="text-sm text-gray-900 truncate mx-auto max-w-full">
@@ -287,10 +306,12 @@ export default function AccountList({ role, token, onCreateClick }) {
                           <span className="text-gray-400">Not set</span>}
                       </div>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-center">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {acc.role}
-                      </span>
+                    <td className="px-3 py-3 text-center">
+                      <div className="text-sm text-gray-900 truncate mx-auto max-w-full">
+                        {acc.office_unit && acc.office_unit.trim() !== '' ? 
+                          acc.office_unit : 
+                          <span className="text-gray-400">Not set</span>}
+                      </div>
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap text-center">
                       <div className="flex justify-center space-x-1">
@@ -359,12 +380,12 @@ export default function AccountList({ role, token, onCreateClick }) {
                 <div className="flex items-center">
                   <img 
                     src={deleteAccount.profile_picture ? `/images/${deleteAccount.profile_picture}` : '/images/default-profile.jpg'} 
-                    alt={deleteAccount.username}
+                    alt={deleteAccount.email}
                     className="w-10 h-10 rounded-full object-cover mr-3"
                     onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
                   />
                   <div>
-                    <p className="font-medium">{deleteAccount.username}</p>
+                    <p className="font-medium">{deleteAccount.email}</p>
                     <p className="text-sm text-gray-500">
                       {deleteAccount.first_name || deleteAccount.last_name ? 
                         `${deleteAccount.first_name || ''} ${deleteAccount.last_name || ''}`.trim() : 
@@ -409,37 +430,39 @@ export default function AccountList({ role, token, onCreateClick }) {
                 )}
               </div>
             )}
-            
-            <div className="flex justify-end gap-3">
-              <button
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-medium transition-colors"
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setDeleteAccount(null);
-                  setError('');
-                }}
-                disabled={deleting}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-medium transition-colors flex items-center"
-                onClick={handleDeleteConfirm}
-                disabled={deleting}
-              >
-                {deleting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Deleting...
-                  </>
-                ) : (
-                  'Delete Account'
-                )}
-              </button>
-            </div>
+            {/* Only show buttons if there is NO success message */}
+            {!success && (
+              <div className="flex justify-end gap-3">
+                <button
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-medium transition-colors"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteAccount(null);
+                    setError('');
+                  }}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-medium transition-colors flex items-center"
+                  onClick={handleDeleteConfirm}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Account'
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

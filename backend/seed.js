@@ -5,33 +5,24 @@ import { CREATE_USERS_TABLE, ROLES } from './models.js';
 async function seed() {
   await pool.query(CREATE_USERS_TABLE);
 
-  // Check if superadmin exists
-  const superadminRes = await pool.query(
-    'SELECT * FROM users WHERE role = $1',
-    [ROLES.SUPERADMIN]
-  );
-  if (superadminRes.rows.length === 0) {
-    const hashed = await bcrypt.hash('dostsuperadmin123', 10);
-    await pool.query(
-      'INSERT INTO users (username, password, role) VALUES ($1, $2, $3)',
-      ['superadmin', hashed, ROLES.SUPERADMIN]
-    );
-    console.log('Superadmin created.');
-  }
+  // Delete all existing users
+  await pool.query('DELETE FROM users');
 
-  // Check if admin exists
-  const adminRes = await pool.query(
-    'SELECT * FROM users WHERE role = $1',
-    [ROLES.ADMIN]
+  // Insert superadmin
+  const superadminPassword = await bcrypt.hash('dostsuperadmin123', 10);
+  await pool.query(
+    'INSERT INTO users (email, password, role, first_name, last_name, office_unit) VALUES ($1, $2, $3, $4, $5, $6)',
+    ['superadmin@region1.dost.gov.ph', superadminPassword, ROLES.SUPERADMIN, 'DOST', null, null]
   );
-  if (adminRes.rows.length === 0) {
-    const hashed = await bcrypt.hash('admin123', 10);
-    await pool.query(
-      'INSERT INTO users (username, password, role) VALUES ($1, $2, $3)',
-      ['admin', hashed, ROLES.ADMIN]
-    );
-    console.log('Admin created.');
-  }
+  console.log('Superadmin created.');
+
+  // Insert admin
+  const adminPassword = await bcrypt.hash('admin123', 10);
+  await pool.query(
+    'INSERT INTO users (email, password, role, first_name, last_name, office_unit) VALUES ($1, $2, $3, $4, $5, $6)',
+    ['admin@region1.dost.gov.ph', adminPassword, ROLES.ADMIN, 'admin', null, 'Regional Office']
+  );
+  console.log('Admin created.');
 
   await pool.end();
   console.log('Seeding complete.');
