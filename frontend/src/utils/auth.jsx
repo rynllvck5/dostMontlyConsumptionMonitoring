@@ -1,6 +1,6 @@
 // Authentication utility functions
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 // Session Expiration Modal Component
 const SessionExpiredModal = ({ onClose }) => {
@@ -43,7 +43,10 @@ export const showSessionExpiredModal = () => {
   const modalRoot = document.createElement('div');
   modalRoot.id = 'session-expired-modal';
   document.body.appendChild(modalRoot);
-  
+
+  // Create a root using React 18+ API
+  const root = createRoot(modalRoot);
+
   // Handle closing the modal and redirecting to login
   const handleClose = () => {
     // Clear auth data
@@ -51,17 +54,17 @@ export const showSessionExpiredModal = () => {
     localStorage.removeItem('role');
     localStorage.removeItem('email');
     localStorage.removeItem('userId');
-    
-    // Remove the modal from DOM
-    ReactDOM.unmountComponentAtNode(modalRoot);
+
+    // Unmount the modal and remove from DOM
+    root.unmount();
     document.body.removeChild(modalRoot);
-    
+
     // Reload the page to redirect to login
     window.location.reload();
   };
-  
+
   // Render the modal
-  ReactDOM.render(<SessionExpiredModal onClose={handleClose} />, modalRoot);
+  root.render(<SessionExpiredModal onClose={handleClose} />);
 };
 
 /**

@@ -2,7 +2,7 @@
 
 ## Version 2.0.0 (May 30, 2025)
 
-A major update to the DOST Monthly Consumption Monitoring System, introducing an inventory system for electric-consuming items and various improvements. This guide will help users upgrade from version 1.0.0 to 2.0.0.
+A major update to the DOST Monthly Consumption Monitoring System, introducing an inventory system for electric-consuming items and various improvements. This guide will help pmos upgrade from version 1.0.0 to 2.0.0.
 
 ---
 
@@ -10,12 +10,12 @@ A major update to the DOST Monthly Consumption Monitoring System, introducing an
 
 ### Major Features
 - **Inventory System for Electric-Consuming Items**: Track and manage items that consume electricity, including quantity, kilowatts, and images.
-- **Profile Picture for Users**: Users can now have profile pictures.
+- **Profile Picture for Preventive Maintenance Officer (PMO)s**: Preventive Maintenance Officer (PMO)s can now have profile pictures.
 - **Database Schema Changes**: New tables and columns to support inventory and images.
-- **Bug Fixes & UI Improvements**: Enhanced user experience and reliability.
+- **Bug Fixes & UI Improvements**: Enhanced pmo experience and reliability.
 
 ### Database Changes
-- Added `profile_picture` column to `users` table.
+- Added `profile_picture` column to `pmos` table.
 - New `consumption_items` table for item inventory.
 - New `item_images` table for associating images with items.
 - Optional: `image_url` column in `consumption_items`.
@@ -44,9 +44,9 @@ Always backup your current data before running migrations.
 #### b. Apply Migration Scripts
 Run the following SQL scripts on your PostgreSQL database (in order):
 
-**Add profile picture to users:**
+**Add profile picture to pmos:**
 ```sql
-ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture VARCHAR(255) NOT NULL DEFAULT 'default-profile.jpg';
+ALTER TABLE pmos ADD COLUMN IF NOT EXISTS profile_picture VARCHAR(255) NOT NULL DEFAULT 'default-profile.jpg';
 ```
 
 **Add inventory system:**
@@ -54,7 +54,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture VARCHAR(255) NOT NULL
 -- Create the consumption_items table
 CREATE TABLE IF NOT EXISTS consumption_items (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id),
+    pmo_id INTEGER REFERENCES pmos(id),
     item_name VARCHAR(100) NOT NULL,
     kilowatts DECIMAL(10,2) NOT NULL,
     quantity INTEGER DEFAULT 1,
@@ -75,24 +75,24 @@ ALTER TABLE consumption_items ADD COLUMN IF NOT EXISTS image_url VARCHAR(255);
 ```
 
 #### c. (Optional) Use Provided Scripts
-You may also run the migration scripts found in `backend/2025-05-27-add-profile-picture-to-users.sql` and `backend/2025-05-29-add-inventory-system.sql` for convenience.
+You may also run the migration scripts found in `backend/2025-05-27-add-profile-picture-to-pmos.sql` and `backend/2025-05-29-add-inventory-system.sql` for convenience.
 
 ### 3. Environment Variables
 No changes required if you already have your `.env` files set up for backend and frontend.
 
 ### 4. Usage Changes
-- Users can now upload and update their profile pictures.
-- Admins and users can manage electric-consuming items and upload images for each item.
+- Preventive Maintenance Officer (PMO)s can now upload and update their profile pictures.
+- Admins and pmos can manage electric-consuming items and upload images for each item.
 
 ### 5. UI/UX Updates
-- Notification bell icon is now in the header, to the left of the user's name, with clear spacing (not in the sidebar).
+- Notification bell icon is now in the header, to the left of the pmo's name, with clear spacing (not in the sidebar).
 - Improved layout and responsiveness.
 
 ---
 
 ## Changelog
 - Inventory system for items (with images)
-- Profile picture support for users
+- Profile picture support for pmos
 - Notification bell moved to header
 - Various UI/UX improvements
 - Bug fixes

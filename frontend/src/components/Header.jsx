@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 // Header is sticky and styled for modern UX
-export default function Header({ firstName, lastName, email, role, onProfileClick }) {
+export default function Header({ fullName, email, role, onProfile, onLogout, onSidebarToggle }) {
   const [profilePicture, setProfilePicture] = useState('/images/default-profile.jpg');
   
   // Fetch user profile data including profile picture
@@ -36,7 +36,16 @@ export default function Header({ firstName, lastName, email, role, onProfileClic
     <header className="w-full h-16 bg-white border-b flex justify-between items-center px-8 shadow-md sticky top-0 z-40">
       <div />
       <div className="flex-1 flex items-center gap-3">
-        <span className="ml-4 px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 font-semibold uppercase">{role}</span>
+        <button
+          className="md:hidden flex items-center justify-center w-9 h-9 hover:bg-blue-50 rounded-full transition-colors mr-3"
+          title="Toggle sidebar"
+          type="button"
+          onClick={onSidebarToggle}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-700">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
       </div>
       <div className="flex items-center gap-6">
         {/* Notification Bell - separate clickable area */}
@@ -53,11 +62,11 @@ export default function Header({ firstName, lastName, email, role, onProfileClic
         {/* Edit Profile Button - only wraps name and profile picture */}
         <button
           className="flex items-center gap-2 focus:outline-none hover:bg-blue-50 px-3 py-1 rounded transition-colors group"
-          onClick={onProfileClick}
+          onClick={onProfile}
           title="Edit your profile"
         >
           <span className="font-semibold text-blue-900 group-hover:text-blue-700">
-            {(firstName || lastName) ? `${firstName} ${lastName}`.trim() : email}
+            {fullName}
           </span>
           <div className="relative">
             <img
@@ -65,7 +74,7 @@ export default function Header({ firstName, lastName, email, role, onProfileClic
               alt="Profile"
               className="w-10 h-10 rounded-full object-cover border-2 border-transparent group-hover:border-blue-500 transition-all duration-200 shadow-sm"
               onError={(e) => {
-                e.target.src = `https://ui-avatars.com/api/?name=${email}&background=1976d2&color=fff&size=32`;
+                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(email || fullName)}&background=1976d2&color=fff&size=32`;
               }}
             />
             <div className="absolute inset-0 bg-blue-500 bg-opacity-0 group-hover:bg-opacity-20 rounded-full transition-all duration-200 flex items-center justify-center">
@@ -75,7 +84,6 @@ export default function Header({ firstName, lastName, email, role, onProfileClic
             </div>
           </div>
         </button>
-
       </div>
     </header>
   );

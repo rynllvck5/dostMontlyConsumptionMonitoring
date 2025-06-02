@@ -16,7 +16,7 @@ GRANT ALL PRIVILEGES ON DATABASE dost_monthly_consumption_monitoring TO postgres
 --   id SERIAL PRIMARY KEY,
 --   email VARCHAR(100) UNIQUE NOT NULL,
 --   password VARCHAR(255) NOT NULL,
---   role VARCHAR(20) NOT NULL CHECK (role IN ('superadmin', 'admin', 'user')),
+--   role VARCHAR(20) NOT NULL CHECK (role IN ('superadmin', 'admin', 'pmo')),
 --   office_unit VARCHAR(100) DEFAULT '',
 --   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 -- );

@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 // Sidebar is sticky and styled for modern dashboard look
 const SidebarCloseButton = ({ onClick }) => (
@@ -15,12 +15,26 @@ const SidebarCloseButton = ({ onClick }) => (
   </button>
 );
 
-export default function Sidebar({ role, fullName, onNav, selected, open = true, onClose, onLogout }) {
-  const navigate = useNavigate();
-  // Determine if dropdown should be visible
-  const isDropdownVisible = selected === 'dashboard-dropdown' || 
-                          selected === 'dropdown-fuel-consumption' || 
-                          selected === 'dropdown-electricity-consumption';
+export default function Sidebar({ role, fullName, open = true, onClose, onLogout }) {
+  const location = useLocation();
+  const path = location.pathname;
+
+  // Helper to check if a route is active
+  const isActive = (route) => path === route;
+
+  // --- Dropdown state for Dashboard (PMO) ---
+  const [dashboardOpen, setDashboardOpen] = React.useState(false);
+  // Sync dropdown open/close state to current path
+  React.useEffect(() => {
+    if (
+      path.startsWith('/' + role + '/fuel-consumption') ||
+      path.startsWith('/' + role + '/electricity-consumption')
+    ) {
+      setDashboardOpen(true);
+    } else {
+      setDashboardOpen(false);
+    }
+  }, [path, role]);
 
   // Responsive: hidden on mobile unless open, overlay for mobile
   // Desktop: always visible
@@ -68,131 +82,124 @@ export default function Sidebar({ role, fullName, onNav, selected, open = true, 
         </div>
       </div>
         <nav className="flex flex-col gap-2">
-          {/*(User Home) */}
-          <button
-            className={`flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${selected === 'dashboard' ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
-            onClick={() => onNav('dashboard')}
+          {/* Home */}
+          <NavLink
+            to={`/${role}/home`}
+            className={({ isActive }) => `flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${isActive ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
             title="Home"
           >
             <img src="/images/home.svg" alt="Home" className="h-6 w-6" />
             <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Home</span>
-          </button>
-          {/* Dashboard Dropdown for user */}
-          {role === 'user' && (
-            <>
-              <div className="relative">
-                <button
-                  className={`flex items-center gap-3 text-left px-4 py-2 rounded transition-colors w-full ${
-                    isDropdownVisible
-                      ? 'bg-blue-800' 
-                      : 'hover:bg-blue-700'
-                  } ${open ? '' : 'justify-center items-center'}`}
-                  title="Dashboard"
-                  onClick={() => onNav('dashboard-dropdown')}
-                  style={{ justifyContent: open ? 'flex-start' : 'center' }}
-                >
-                  <img src="/images/dashboard.svg" alt="Dashboard" className="h-6 w-6" />
-                  <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Dashboard</span>
-                  <svg 
-                    className={`ml-auto transition-transform duration-300 ease-in-out ${
-                      isDropdownVisible ? 'rotate-180' : ''
-                    } ${open ? '' : 'hidden'}`} 
-                    width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"
+          </NavLink>
+          {/* Dashboard Dropdown for PMO */}
+          {role === 'pmo' && (
+              <>
+                <div className="relative">
+                  <button
+                    className={`flex items-center gap-3 text-left px-4 py-2 rounded transition-colors w-full ${
+                      dashboardOpen
+                        ? 'bg-blue-800' 
+                        : 'hover:bg-blue-700'
+                    } ${open ? '' : 'justify-center items-center'}`}
+                    title="Dashboard"
+                    style={{ justifyContent: open ? 'flex-start' : 'center' }}
+                    type="button"
+                    onClick={() => setDashboardOpen((open) => !open)}
+                    aria-expanded={dashboardOpen}
+                    aria-controls="dashboard-dropdown"
                   >
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </button>
-                {/* Dropdown container - always render but control visibility with height/opacity */}
-                <div 
-                  className={`ml-8 overflow-hidden transition-all duration-300 ease-in-out ${
-                    isDropdownVisible 
-                      ? 'max-h-[120px] opacity-100 mt-1' 
-                      : 'max-h-0 opacity-0 mt-0'
-                  }`}
-                >
-                  {/* Dropdown content */}
-                  <div className="flex flex-col gap-1 bg-blue-900 rounded shadow-lg z-20">
-                    <button
-                      className={`flex items-center gap-3 px-4 py-2 rounded transition-all duration-200 text-left ${
-                        selected === 'fuel-consumption' || selected === 'dropdown-fuel-consumption' 
-                          ? 'bg-blue-600 text-white' 
-                          : 'hover:bg-blue-600 text-blue-100'
-                      }`}
-                      onClick={() => onNav('fuel-consumption')}
+                    <img src="/images/dashboard.svg" alt="Dashboard" className="h-6 w-6" />
+                    <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Dashboard</span>
+                    <svg 
+                      className={`ml-auto transition-transform duration-300 ease-in-out ${
+                        dashboardOpen ? 'rotate-180' : ''
+                      } ${open ? '' : 'hidden'}`} 
+                      width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"
                     >
-                      <span>Fuel Consumption</span>
-                    </button>
-                    <button
-                      className={`flex items-center gap-3 px-4 py-2 rounded transition-all duration-200 text-left ${
-                        selected === 'electricity-consumption' || selected === 'dropdown-electricity-consumption'
-                          ? 'bg-blue-600 text-white' 
-                          : 'hover:bg-blue-600 text-blue-100'
-                      }`}
-                      onClick={() => onNav('electricity-consumption')}
-                    >
-                      <span>Electricity Consumption</span>
-                    </button>
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+                  {/* Dropdown container - always render but control visibility with height/opacity */}
+                  <div 
+                    id="dashboard-dropdown"
+                    className={`ml-8 overflow-hidden transition-all duration-300 ease-in-out ${
+                      dashboardOpen 
+                        ? 'max-h-[120px] opacity-100 mt-1' 
+                        : 'max-h-0 opacity-0 mt-0'
+                    }`}
+                  >
+                    {/* Dropdown content */}
+                    <div className="flex flex-col gap-1 bg-blue-900 rounded shadow-lg z-20">
+                      <NavLink
+                        to={`/${role}/fuel-consumption`}
+                        className={({ isActive }) => `flex items-center gap-3 px-4 py-2 rounded transition-all duration-200 text-left ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-blue-600 text-blue-100'}`}
+                      >
+                        <span>Fuel Consumption</span>
+                      </NavLink>
+                      <NavLink
+                        to={`/${role}/electricity-consumption`}
+                        className={({ isActive }) => `flex items-center gap-3 px-4 py-2 rounded transition-all duration-200 text-left ${isActive ? 'bg-blue-600 text-white' : 'hover:bg-blue-600 text-blue-100'}`}
+                      >
+                        <span>Electricity Consumption</span>
+                      </NavLink>
+                    </div>
                   </div>
                 </div>
-              </div>
-              {/* Item Inventory (user only, below dashboard dropdown) */}
-              <button
-                className={`flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${selected === 'item-inventory' ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
-                onClick={() => onNav('item-inventory')}
-                title="Item Inventory"
-              >
-                <img src="/images/item-inventory.svg" alt="Item Inventory" className="h-6 w-6" />
-                <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Item Inventory</span>
-              </button>
+              {/* Item Inventory (pmo only, below dashboard dropdown) */}
+              <NavLink
+                 to={`/${role}/item-inventory`}
+                 className={({ isActive }) => `flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${isActive ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
+                 title="Item Inventory"
+               >
+                 <img src="/images/item-inventory.svg" alt="Item Inventory" className="h-6 w-6" />
+                 <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Item Inventory</span>
+               </NavLink>
              </>
            )}
 
         {/* Admin Management (superadmin only) */}
           {role === 'superadmin' && (
-            <>
-              <button
-                className={`flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${selected === 'admin-management' ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
-                onClick={() => onNav('admin-management')}
-                title="Admin Management"
-              >
-                {/* Users Icon */}
-                <img src="/images/admin-management.svg" alt="Admin Management" className="h-6 w-6" />
-                <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Admin Management</span>
-              </button>
-              <button
-                className={`flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${selected === 'user-management' ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
-                onClick={() => onNav('user-management')}
-                title="User Management"
-              >
-                {/* User Group Icon */}
-                <img src="/images/user-management.svg" alt="User Management" className="h-6 w-6" />
-                <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>User Management</span>
-              </button>
-            </>
-          )}
+             <>
+               <NavLink
+                 to="/superadmin/admin-management"
+                 className={({ isActive }) => `flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${isActive ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
+                 title="Admin Management"
+               >
+                 <img src="/images/admin-management.svg" alt="Admin Management" className="h-6 w-6" />
+                 <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Admin Management</span>
+               </NavLink>
+               <NavLink
+                 to="/superadmin/user-management"
+                 className={({ isActive }) => `flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${isActive ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
+                 title="PMO Management"
+               >
+                 <img src="/images/user-management.svg" alt="PMO Management" className="h-6 w-6" />
+                 <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>PMO Management</span>
+               </NavLink>
+             </>
+           )}
           {/* User Management (admin only) */}
           {role === 'admin' && (
-            <button
-              className={`flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${selected === 'user-management' ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
-              onClick={() => onNav('user-management')}
-              title="User Management"
-            >
-              {/* User Group Icon */}
-              <img src="/images/user-management.svg" alt="User Management" className="h-6 w-6" />
-              <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>User Management</span>
-            </button>
-          )}
+             <NavLink
+               to="/admin/user-management"
+               className={({ isActive }) => `flex items-center gap-3 text-left px-4 py-2 rounded transition-colors ${isActive ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
+               title="PMO Management"
+             >
+               <img src="/images/user-management.svg" alt="PMO Management" className="h-6 w-6" />
+               <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>PMO Management</span>
+             </NavLink>
+           )}
         </nav>
         {/* Profile button above logout at the very bottom */}
         <div className="mt-auto flex flex-col gap-3 pt-8">
-          <button
-            className={`flex items-center gap-3 w-full text-left px-4 py-2 rounded transition-colors ${selected === 'profile' ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
-            onClick={() => onNav('profile')}
-            title="Profile"
-          >
-            <img src="/images/profile.svg" alt="Profile" className="h-6 w-6" />
-            <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Profile</span>
-          </button>
+          <NavLink
+              to={`/${role}/profile`}
+              className={({ isActive }) => `flex items-center gap-3 w-full text-left px-4 py-2 rounded transition-colors ${isActive ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
+              title="Profile"
+            >
+              <img src="/images/profile.svg" alt="Profile" className="h-6 w-6" />
+              <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Profile</span>
+            </NavLink>
           {onLogout && (
             <button
               className={`flex items-center gap-3 w-full text-left px-4 py-2 rounded transition-colors font-semibold hover:bg-red-700 ${open ? '' : 'justify-center items-center'}`}

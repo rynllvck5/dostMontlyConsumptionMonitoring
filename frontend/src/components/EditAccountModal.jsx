@@ -63,10 +63,11 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
           formData.append('userId', account.id);
         }
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+        const currentToken = localStorage.getItem('token');
         const uploadRes = await fetch(`${API_URL}/upload-profile-picture`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${currentToken}`
           },
           body: formData
         });
@@ -80,11 +81,13 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
         }
       }
       // Update account info, including new profile_picture filename if uploaded
-      const res = await fetch(`http://localhost:5000/api/auth/account/${account.id}`, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+      const currentToken = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/account/${account.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${currentToken}`
         },
         body: JSON.stringify({
           email,
@@ -276,8 +279,8 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
                     <div className="mb-4 text-gray-800">
                       Are you sure you want to reset this account password to the default?
                       <div className="mt-2 p-3 bg-gray-100 rounded-md">
-                        <span className="font-medium">Default password for {account.role} accounts: </span>
-                        <span className="font-semibold text-blue-700">{account.role === 'admin' ? 'admin123' : 'userpassword'}</span>
+                        <span className="font-medium">Default password for {account.role === 'admin' ? 'admin' : account.role === 'pmo' ? 'PMO' : 'user'} accounts: </span>
+                        <span className="font-semibold text-blue-700">{account.role === 'admin' ? 'admin123' : (account.role === 'pmo' ? 'pmopassword' : 'userpassword')}</span>
                       </div>
                     </div>
                     <div className="flex justify-end gap-2">
@@ -289,30 +292,30 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
                         className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                         disabled={resetting}
                         onClick={async () => {
-  setResetting(true);
-  setError('');
-  setSuccess('');
-  try {
-    const res = await fetch(`http://localhost:5000/api/auth/account/${account.id}/reset-password`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    const data = await res.json();
-    if (data.success) {
-      const defaultPassword = account.role === 'admin' ? 'admin123' : 'userpassword';
-      setSuccess(`Password has been reset to "${defaultPassword}"`);
-      setTimeout(onClose, 1500);
-    } else if (!handleTokenError(data.message)) {
-      setError(data.message || 'Failed to reset password.');
-    }
-  } catch (err) {
-    setError('Failed to reset password.');
-  }
-  setResetting(false);
-  setShowResetConfirm(false);
-}}
+                          setResetting(true);
+                          setError('');
+                          setSuccess('');
+                          try {
+                            const res = await fetch(`http://localhost:5000/api/auth/account/${account.id}/reset-password`, {
+                              method: 'POST',
+                              headers: {
+                                'Authorization': `Bearer ${token}`
+                              }
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                              const defaultPassword = account.role === 'admin' ? 'admin123' : (account.role === 'pmo' ? 'pmopassword' : 'userpassword');
+                              setSuccess(`Password has been reset to "${defaultPassword}"`);
+                              setTimeout(onClose, 1500);
+                            } else if (!handleTokenError(data.message)) {
+                              setError(data.message || 'Failed to reset password.');
+                            }
+                          } catch (err) {
+                            setError('Failed to reset password.');
+                          }
+                          setResetting(false);
+                          setShowResetConfirm(false);
+                        }}
                       >Reset Password</button>
                     </div>
                   </div>
@@ -320,7 +323,7 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
               )}
             </div>
           )}
-
+          
           {/* Message container at the bottom */}
           {(error || success) && (
             <div className="mt-4 mb-2">

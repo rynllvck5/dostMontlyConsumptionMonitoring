@@ -128,18 +128,19 @@ export default function ProfileModal({ user, open, onClose }) {
       if (profilePicFile) {
         const formData = new FormData();
         formData.append("profile_picture", profilePicFile);
-        formData.append("userId", user.id);
-        
-        const uploadRes = await fetch("http://localhost:5000/api/auth/upload-profile-picture", {
+        // Only include userId if the current user is admin or superadmin
+        if ((user.role === "admin" || user.role === "superadmin") && user.id) {
+          formData.append("userId", user.id);
+        }
+        const uploadRes = await fetch(`${API_URL}/upload-profile-picture`, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${token}`
+            // Note: Do NOT set Content-Type when sending FormData; browser will set it including boundary
           },
           body: formData
         });
-        
         const uploadData = await uploadRes.json();
-        
         if (uploadData.success && uploadData.filename) {
           newProfilePicFilename = uploadData.filename;
         } else if (!handleTokenError(uploadData.message)) {
@@ -318,7 +319,24 @@ export default function ProfileModal({ user, open, onClose }) {
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">New Password</label>
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-xs bg-gray-200 hover:bg-blue-200 rounded transition-colors whitespace-nowrap ml-2"
+                    title="Set password to default (dost12345)"
+                    onClick={() => {
+                      let defPwd = 'dost12345';
+                      if (user.role === 'admin') defPwd = 'admin123';
+                      else if (user.role === 'superadmin') defPwd = 'dostsuperadmin123';
+                      else if (user.role === 'pmo') defPwd = 'pmopassword';
+                      setNewPassword(defPwd);
+                      setConfirmPassword(defPwd);
+                    }}
+                  >
+                    Use Default
+                  </button>
+                </div>
                 <input
                   type="password"
                   className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -326,6 +344,14 @@ export default function ProfileModal({ user, open, onClose }) {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+  Click 'Use Default' to set password to <span className="font-mono">{
+    user.role === 'admin' ? 'admin123' :
+    user.role === 'superadmin' ? 'dostsuperadmin123' :
+    user.role === 'pmo' ? 'pmopassword' :
+    'dost12345'
+  }</span>.
+</p>
               </div>
               
               <div className="mb-4">

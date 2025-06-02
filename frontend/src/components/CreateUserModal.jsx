@@ -65,7 +65,7 @@ if (!open) return null;
         setUploading(true);
         const formData = new FormData();
         formData.append('profile_picture', profilePicFile);
-        // No userId since user does not exist yet
+        // No pmoId since pmo does not exist yet
         try {
           const uploadRes = await fetch('http://localhost:5000/api/auth/upload-profile-picture', {
             method: 'POST',
@@ -89,44 +89,43 @@ if (!open) return null;
         }
       }
       
-      // Create the user with the profile picture filename if available
-      const result = await onCreate({
-        email,
-        password,
-        role,
-        first_name: firstName,
-        last_name: lastName,
-        office_unit: officeUnit,
-        profile_picture: profilePicFilename
+      // Create the account with the profile picture filename if available
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+      const currentToken = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/create-pmo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentToken}`
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          role,
+          first_name: firstName,
+          last_name: lastName,
+          office_unit: officeUnit,
+          profile_picture: profilePicFilename
+        })
       });
-      
+      const result = await res.json();
       if (result && result.success) {
-        const accountType = role === 'admin' ? 'Admin' : 'User';
-        setSuccess(`${accountType} account "${email}" was created successfully!`);
-        // Clear form fields
-        setEmail("");
-        setPassword("");
-        setConfirmPassword("");
-        setFirstName("");
-        setLastName("");
-        setOfficeUnit("");
-        setProfilePicFile(null);
-        setProfilePicPreview('/images/default-profile.jpg');
-        // Close modal after a delay
+        setSuccess('Account created successfully!');
+        if (fetchAccounts) fetchAccounts();
         setTimeout(() => {
-  if (typeof fetchAccounts === 'function') fetchAccounts();
-  onClose();
-}, 1500);
+          setSuccess('');
+          onClose();
+        }, 1500);
       } else {
         // Handle specific error messages
         if (result && result.message) {
-          if (result.message.includes('Email already exists')) {
+          if (result.message.includes('Email "' + email + '" already exists')) {
             setError(`The email "${email}" already exists. Please choose a different email.`);
           } else {
             setError(result.message);
           }
         } else {
-          setError("Failed to create user account. Please try again.");
+          setError('Failed to create account. Please try again.');
         }
       }
     } catch (error) {
@@ -147,7 +146,7 @@ if (!open) return null;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 relative animate-fadeIn">
-        <h2 className="text-2xl font-bold mb-6 text-center">{role === 'admin' ? 'Create Admin' : 'Create User'}</h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">{role === 'admin' ? 'Create Admin' : 'Create Preventive Maintenance Officer (PMO)'}</h2>
         <form onSubmit={handleSubmit}>
           {/* Role selection removed; role is determined by parent context */}
           <div className="mb-4 flex flex-col items-center">
@@ -264,76 +263,84 @@ if (!open) return null;
               ))}
             </select>
           </div>
+
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <div className="flex gap-2 items-center">
-              <div className="relative flex-1">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-700 text-lg px-1"
-                  tabIndex={-1}
-                  onClick={() => setShowPassword(v => !v)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12.001C3.226 16.338 7.322 19.5 12 19.5c1.7 0 3.304-.356 4.736-.995M21.002 15.584A10.45 10.45 0 0022.066 12c-1.292-4.337-5.388-7.5-10.066-7.5-1.132 0-2.224.186-3.24.528" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" /></svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12c0 2.485 2.485 7.5 9.75 7.5s9.75-5.015 9.75-7.5S19.515 4.5 12 4.5 2.25 9.515 2.25 12z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  )}
-                </button>
-              </div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium text-gray-700">Password</label>
               <button
                 type="button"
-                className="px-2 py-1 text-xs bg-gray-200 hover:bg-blue-200 rounded transition-colors whitespace-nowrap"
-                onClick={() => setPassword(role === 'admin' ? 'admin123' : 'userpassword')}
+                className="px-2 py-1 text-xs bg-gray-200 hover:bg-blue-200 rounded transition-colors whitespace-nowrap ml-2"
+                onClick={() => {
+                  let defPwd = 'dost12345';
+                  if (role === 'admin') defPwd = 'admin123';
+                  else if (role === 'superadmin') defPwd = 'dostsuperadmin123';
+                  else if (role === 'pmo') defPwd = 'pmopassword';
+                  setPassword(defPwd);
+                  setConfirmPassword(defPwd);
+                }}
               >
                 Use Default
               </button>
             </div>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-700 text-lg px-1"
+                tabIndex={-1}
+                onClick={() => setShowPassword(v => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12.001C3.226 16.338 7.322 19.5 12 19.5c1.7 0 3.304-.356 4.736-.995M21.002 15.584A10.45 10.45 0 0022.066 12c-1.292-4.337-5.388-7.5-10.066-7.5-1.132 0-2.224.186-3.24.528" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" /></svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12c0 2.485 2.485 7.5 9.75 7.5s9.75-5.015 9.75-7.5S19.515 4.5 12 4.5 2.25 9.515 2.25 12z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Click 'Use Default' to set password to <span className="font-mono">{
+                role === 'admin' ? 'admin123' :
+                role === 'superadmin' ? 'dostsuperadmin123' :
+                role === 'pmo' ? 'pmopassword' :
+                'dost12345'
+              }</span>.
+            </p>
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <div className="flex gap-2 items-center">
-              <div className="relative flex-1">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-700 text-lg px-1"
-                  tabIndex={-1}
-                  onClick={() => setShowConfirmPassword(v => !v)}
-                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                >
-                  {showConfirmPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12.001C3.226 16.338 7.322 19.5 12 19.5c1.7 0 3.304-.356 4.736-.995M21.002 15.584A10.45 10.45 0 0022.066 12c-1.292-4.337-5.388-7.5-10.066-7.5-1.132 0-2.224.186-3.24.528" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" /></svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12c0 2.485 2.485 7.5 9.75 7.5s9.75-5.015 9.75-7.5S19.515 4.5 12 4.5 2.25 9.515 2.25 12z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  )}
-                </button>
-              </div>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
               <button
                 type="button"
-                className="px-2 py-1 text-xs bg-gray-200 hover:bg-blue-200 rounded transition-colors whitespace-nowrap"
-                onClick={() => setConfirmPassword(role === 'admin' ? 'admin123' : 'userpassword')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-700 text-lg px-1"
+                tabIndex={-1}
+                onClick={() => setShowConfirmPassword(v => !v)}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
-                Use Default
+                {showConfirmPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12.001C3.226 16.338 7.322 19.5 12 19.5c1.7 0 3.304-.356 4.736-.995M21.002 15.584A10.45 10.45 0 0022.066 12c-1.292-4.337-5.388-7.5-10.066-7.5-1.132 0-2.224.186-3.24.528" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" /></svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12c0 2.485 2.485 7.5 9.75 7.5s9.75-5.015 9.75-7.5S19.515 4.5 12 4.5 2.25 9.515 2.25 12z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                )}
               </button>
             </div>
           </div>
+
           {/* Message container */}
           {(error || success) && (
             <div className="mt-4 mb-2">

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Login from './Login.jsx';
 // import Signup from './Signup.jsx';
 import Sidebar from './components/Sidebar';
+import ConsumptionItemsSection from './components/ConsumptionItemsSection';
+import AccountList from './components/AccountList';
+
 import Header from './components/Header';
 import FuelConsumption from './FuelConsumption';
 import ElectricityConsumption from './ElectricityConsumption';
-import ConsumptionItemsSection from "./components/ConsumptionItemsSection";
 
 // Chevron button for mini-sidebar (right)
 const MiniSidebarButton = ({ onClick }) => (
@@ -36,68 +38,42 @@ const SidebarCloseButton = ({ onClick }) => (
 
 import ProfileModal from './components/ProfileModal';
 import CreateUserModal from './components/CreateUserModal';
-import AccountList from './components/AccountList';
 
 
 function DashboardContent({ role, onOpenCreateUser, onCardClick, view }) {
-  const displayRole = role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User';
+  // Only show cards for PMO home dashboard
+  if (role === 'pmo' && view === 'home') {
+    return (
+      <div className="flex flex-col md:flex-row gap-6 justify-center items-center mt-12">
+        {/* Fuel Consumption Card */}
+        <a
+          href="/pmo/fuel-consumption"
+          className="bg-white rounded-xl shadow-lg p-8 w-72 flex flex-col items-center hover:shadow-2xl hover:bg-blue-50 transition-all border border-blue-100 hover:border-blue-400 group"
+        >
+          <img src="/images/fuel.svg" alt="Fuel Consumption" className="h-16 w-16 mb-4 group-hover:scale-105 transition-transform" />
+          <span className="text-lg font-bold text-blue-900 mb-2">Fuel Consumption</span>
+          <span className="text-gray-500 text-sm text-center">View and manage monthly fuel consumption records.</span>
+        </a>
+        {/* Electricity Consumption Card */}
+        <a
+          href="/pmo/electricity-consumption"
+          className="bg-white rounded-xl shadow-lg p-8 w-72 flex flex-col items-center hover:shadow-2xl hover:bg-blue-50 transition-all border border-blue-100 hover:border-blue-400 group"
+        >
+          <img src="/images/electricity.svg" alt="Electricity Consumption" className="h-16 w-16 mb-4 group-hover:scale-105 transition-transform" />
+          <span className="text-lg font-bold text-blue-900 mb-2">Electricity Consumption</span>
+          <span className="text-gray-500 text-sm text-center">View and manage monthly electricity consumption records.</span>
+        </a>
+      </div>
+    );
+  }
+  // Placeholder for other roles/views
   return (
-    <div>
-      {view === 'home' && (
-        <>
-          <h2>Welcome, {displayRole}</h2>
-          {role === 'superadmin' && (
-            <div className="my-4">
-              <b>Superadmin Panel:</b> Manage all users and admins here.
-              <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold transition-colors" onClick={() => onOpenCreateUser('superadmin')}>
-                Create Admin/User
-              </button>
-            </div>
-          )}
-          {role === 'admin' && (
-            <div className="my-4">
-              <b>Admin Panel:</b> Manage users here.
-            </div>
-          )}
-          {!role && (
-            <div>
-              <span>General Dashboard</span>
-              <p>Welcome to your dashboard. Please log in to see more details.</p>
-            </div>
-          )}
-        </>
-      )}
-      {role === 'user' && (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] w-full">
-          <div className="flex flex-col md:flex-row gap-8 w-full max-w-2xl justify-center items-center">
-            {/* Fuel Consumption Card */}
-            <button
-              className="bg-blue-100 shadow-lg rounded-xl p-8 flex-1 min-w-[260px] max-w-xs h-48 flex flex-col justify-start relative hover:shadow-xl hover:scale-105 transition-transform"
-              style={{ cursor: 'pointer' }}
-              onClick={() => onCardClick && onCardClick('fuel-consumption')}
-            >
-              <span className="text-lg font-semibold text-blue-900 absolute top-6 left-8">Fuel Consumption</span>
-            </button>
-            {/* Electricity Consumption Card */}
-            <button
-              className="bg-yellow-100 shadow-lg rounded-xl p-8 flex-1 min-w-[260px] max-w-xs h-48 flex flex-col justify-start relative hover:shadow-xl hover:scale-105 transition-transform"
-              style={{ cursor: 'pointer' }}
-              onClick={() => onCardClick && onCardClick('electricity-consumption')}
-            >
-              <span className="text-lg font-semibold text-yellow-900 absolute top-6 left-8">Electricity Consumption</span>
-            </button>
-          </div>
-        </div>
-      )}
-      {!role && (
-        <div>
-          <span>General Dashboard</span>
-          <p>Welcome to your dashboard. Please log in to see more details.</p>
-        </div>
-      )}
+    <div className="flex flex-col items-center justify-center min-h-[40vh] text-gray-400">
+      <span>No dashboard content available.</span>
     </div>
   );
 }
+
 
 function AppShell() {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -109,74 +85,19 @@ function AppShell() {
   const [firstName, setFirstName] = useState(localStorage.getItem('firstName') || '');
   const [lastName, setLastName] = useState(localStorage.getItem('lastName') || '');
   const [userId, setUserId] = useState(localStorage.getItem('userId') || '');
-  const [nav, setNav] = useState('dashboard');
   const [profileOpen, setProfileOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768); // md breakpoint
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Set the correct navigation state based on the current URL path
+  // Responsive sidebar toggle
   React.useEffect(() => {
-    const path = location.pathname;
-    if (path === '/') {
-      setNav('dashboard');
-    } else if (path === '/fuel-consumption') {
-      // For consumption pages, show both the dropdown and the selected item
-      if (role === 'user') {
-        // Set a special combined state for dropdown + selection
-        setNav('dropdown-fuel-consumption');
-      } else {
-        setNav('fuel-consumption');
-      }
-    } else if (path === '/electricity-consumption') {
-      if (role === 'user') {
-        // Set a special combined state for dropdown + selection
-        setNav('dropdown-electricity-consumption');
-      } else {
-        setNav('electricity-consumption');
-      }
-    } else if (path === '/electricity-consumption-main') {
-      setNav('electricity-consumption');
-    }
-  }, [location, role]);
-
-  // Navigation handler for sidebar and cards
-  const handleNav = (navKey) => {
-    // Set navigation state based on selected item
-    if (navKey === 'dashboard-dropdown') {
-      // Toggle dropdown when clicked
-      if (nav === 'dashboard-dropdown') {
-        setNav('');
-      } else if (nav === 'dropdown-fuel-consumption') {
-        setNav('fuel-consumption');
-      } else if (nav === 'dropdown-electricity-consumption') {
-        setNav('electricity-consumption');
-      } else {
-        setNav('dashboard-dropdown');
-      }
-      return; // Don't navigate
-    } else if (navKey === 'fuel-consumption') {
-      // For consumption items, we need to maintain dropdown state
-      setNav('dropdown-fuel-consumption');
-      navigate('/fuel-consumption');
-    } else if (navKey === 'electricity-consumption') {
-      // For consumption items, we need to maintain dropdown state
-      setNav('dropdown-electricity-consumption');
-      navigate('/electricity-consumption');
-    } else if (navKey === 'dashboard') {
-      setNav(navKey);
-      navigate('/');
-    } else if (navKey === 'electricity-consumption-main') {
-      setNav(navKey);
-      navigate('/electricity-consumption');
-    } else if (navKey === 'item-inventory') {
-      setNav('item-inventory');
-      navigate('/item-inventory');
-    } else {
-      // For other navigation items, close any open dropdown
-      setNav(navKey);
-    }
-  };
+    const handleResize = () => {
+      if (window.innerWidth >= 768) setSidebarOpen(true);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ... (rest of the logic is unchanged)
 
@@ -254,7 +175,18 @@ function AppShell() {
     localStorage.setItem('token', jwt);
     localStorage.setItem('role', userRole);
     localStorage.setItem('email', uname);
+    // Always navigate to the correct home page after login
+    if (userRole === 'superadmin') {
+      navigate('/superadmin/home', { replace: true });
+    } else if (userRole === 'admin') {
+      navigate('/admin/home', { replace: true });
+    } else if (userRole === 'pmo') {
+      navigate('/pmo/home', { replace: true });
+    } else {
+      navigate('/', { replace: true });
+    }
   };
+
   const handleLogout = () => {
     setToken(null);
     setRole(null);
@@ -306,129 +238,64 @@ function AppShell() {
     // Compute full name for sidebar
     const fullName = (firstName || lastName) ? `${firstName} ${lastName}`.trim() : email;
     return (
-      <div className="flex h-screen bg-gray-100 relative">
-        {/* Only render a single Sidebar, which morphs between open and closed states */}
+      <div className="flex h-screen">
         <Sidebar
           role={role}
           fullName={fullName}
-          onNav={handleNav}
-          selected={nav}
           open={sidebarOpen}
-          onClose={() => setSidebarOpen(!sidebarOpen)}
+          onClose={() => setSidebarOpen(false)}
           onLogout={handleLogout}
         />
-        <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300`}>
-          <Header
-            email={email}
-            firstName={firstName}
-            lastName={lastName}
-            role={role}
-            onProfileClick={() => {
-              setNav('profile');
-              setProfileOpen(true);
-            }}
-            onLogout={handleLogout}
-          />
-          <main className="flex-1 overflow-auto">
+        <div className="flex-1 flex flex-col min-w-0">
+           <Header
+             fullName={fullName}
+             email={email}
+             role={role}
+             onProfile={() => setProfileOpen(true)}
+             onSidebarToggle={() => setSidebarOpen((v) => !v)}
+           />
+           {/* Profile modal always available and controlled by state */}
+           <ProfileModal 
+             user={{ email, firstName, lastName, role }}
+             open={profileOpen}
+             onClose={() => setProfileOpen(false)}
+           />
+          <main className="flex-1 overflow-y-auto bg-gray-100 px-2 md:px-6 py-4">
             <Routes>
-              <Route path="/" element={<DashboardContent role={role} onOpenCreateUser={setCreateUserOpen} onCardClick={handleNav} />} />
-              <Route path="/fuel-consumption" element={<FuelConsumption />} />
-              <Route path="/electricity-consumption" element={<ElectricityConsumption />} />
-              <Route path="/item-inventory" element={<ConsumptionItemsSection token={token} />} />
-            </Routes>
-
-            {nav === 'profile' && (
-              <ProfileModal
-                user={{ email, role, id: userId }}
-                open={profileOpen}
-                onClose={() => setProfileOpen(false)}
-              />
-            )}
-            {nav === 'admin-management' && role === 'superadmin' && (
-              <div className="p-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                  <h2 className="text-2xl font-bold">Admin Management</h2>
-                  <button 
-                    className="mt-4 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors flex items-center justify-center"
-                    onClick={() => { setCreateUserType('admin'); setCreateUserOpen(true); }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Create Admin
-                  </button>
-                </div>
-                <div>
-                  <AccountList 
-                    role="admin" 
-                    token={token} 
-                    onCreateClick={() => { setCreateUserType('admin'); setCreateUserOpen(true); }} 
-                  />
-                </div>
-              </div>
-            )}
-            {nav === 'user-management' && (role === 'admin' || role === 'superadmin') && (
-              <div className="p-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-                  <h2 className="text-2xl font-bold">User Management</h2>
-                  <button 
-                    className="mt-4 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors flex items-center justify-center"
-                    onClick={() => { setCreateUserType('user'); setCreateUserOpen(true); }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Create User
-                  </button>
-                </div>
-                <div>
-                  <AccountList 
-                    role="user" 
-                    token={token} 
-                    onCreateClick={() => { setCreateUserType('user'); setCreateUserOpen(true); }}
-                  />
-                </div>
-              </div>
-            )}
-          </main>
+                <Route path="/" element={token ? <Navigate to={`/${role}/home`} /> : <Login onLogin={handleSwitchView} />} />
+                <Route path="/login" element={<Login onLogin={handleSwitchView} />} />
+                {/* PMO Routes */}
+                <Route path="/pmo/home" element={<DashboardContent role="pmo" view="home" />} />
+                <Route path="/pmo/fuel-consumption" element={<FuelConsumption />} />
+                <Route path="/pmo/electricity-consumption" element={<ElectricityConsumption />} />
+                <Route path="/pmo/item-inventory" element={<ConsumptionItemsSection token={token} />} />
+                {/* Admin Routes */}
+                <Route path="/admin/home" element={<DashboardContent role="admin" view="home" />} />
+                <Route path="/admin/item-inventory" element={<ConsumptionItemsSection token={token} />} />
+                <Route path="/admin/user-management" element={<AccountList role="pmo" />} />
+                {/* Superadmin Routes */}
+                <Route path="/superadmin/home" element={<DashboardContent role="superadmin" view="home" />} />
+                <Route path="/superadmin/admin-management" element={<AccountList role="admin" />} />
+                <Route path="/superadmin/user-management" element={<AccountList role="pmo" />} />
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to={token && role ? `/${role}/home` : '/login'} />} />
+              </Routes>
+            </main>
+          </div>
         </div>
-        <CreateUserModal
-          open={createUserOpen}
-          onClose={() => setCreateUserOpen(false)}
-          isSuperadmin={createUserType === 'superadmin'}
-          role={createUserType} 
-          onCreate={async (user) => {
-            if (!user) return { success: false, message: 'No user data provided.' };
-            const { email, password, first_name, last_name, profile_picture, office_unit } = user;
-            const { createUser, checkEmailExists } = await import('./api');
-            const token = localStorage.getItem('token');
-            if (!token) return { success: false, message: 'Not authenticated.' };
-            // Check if username exists for this role
-            const check = await checkEmailExists(email, createUserType);
-            if (check.exists) {
-              return { success: false, message: `Email '${email}' already exists.` };
-            }
-            // Pass all required fields including office_unit to the API
-            const result = await createUser({ email, password, role: createUserType, token, first_name, last_name, profile_picture, office_unit });
-            return result;
-          }}
-        />
-      </div>
     );
   }
-
-  if (view === 'login') {
-    return <Login onLogin={handleSwitchView} />;
-  }
-  // No other views supported now
-  return null;
+  // Not logged in: show login screen
+  return <Login onLogin={handleSwitchView} />;
 }
+
+// Duplicate AppShell removed. Only one AppShell should exist in this file.
 
 function App() {
   return (
-    <Router>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AppShell />
-    </Router>
+    </BrowserRouter>
   );
 }
 

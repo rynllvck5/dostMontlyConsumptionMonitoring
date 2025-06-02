@@ -101,7 +101,7 @@ export default function AccountList({ role, token, onCreateClick }) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const userRole = localStorage.getItem('role'); // Get the currently logged-in user's role
+  const userRole = localStorage.getItem('role'); // Get the currently logged-in PMO's role
 
   const fetchAccounts = async () => {
     
@@ -110,8 +110,9 @@ export default function AccountList({ role, token, onCreateClick }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
-    const res = await fetch(`${API_URL}/accounts?role=${role}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const currentToken = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/accounts?role=${role}`, {
+        headers: { 'Authorization': `Bearer ${currentToken}` }
       });
       const data = await res.json();
       console.log('Fetched accounts:', data);
@@ -133,9 +134,12 @@ export default function AccountList({ role, token, onCreateClick }) {
   };
 
   useEffect(() => {
+    // Only fetch if token and userRole are present and allowed
+    if (!localStorage.getItem('token')) return;
+    if (!['admin', 'superadmin'].includes(userRole)) return;
     fetchAccounts();
     // eslint-disable-next-line
-  }, [role]);
+  }, [role, userRole]);
 
   // Filter accounts when search term changes
   useEffect(() => {
@@ -172,9 +176,10 @@ export default function AccountList({ role, token, onCreateClick }) {
     setError('');
     
     try {
+      const currentToken = localStorage.getItem('token');
       const res = await fetch(`${API_URL}/account/${deleteAccount.id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${currentToken}` }
       });
       
       const data = await res.json();
@@ -209,6 +214,18 @@ export default function AccountList({ role, token, onCreateClick }) {
   return (
     <div>
       {error && <div className="bg-red-100 text-red-700 px-4 py-2 rounded mb-4">{error}</div>}
+
+      {/* Add Admin/PMO button for admin and superadmin */}
+      {((role === 'pmo' && (userRole === 'admin' || userRole === 'superadmin')) || (role === 'admin' && userRole === 'superadmin')) && (
+        <div className="mb-4 flex justify-end">
+          <button
+            className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 transition-colors font-semibold"
+            onClick={() => setShowCreateModal(true)}
+          >
+            {role === 'admin' ? 'Add Admin' : 'Add PMO'}
+          </button>
+        </div>
+      )}
       
       {/* Search bar */}
       <div className="mb-4 relative">
@@ -220,7 +237,7 @@ export default function AccountList({ role, token, onCreateClick }) {
           </div>
           <input
             type="text"
-            placeholder={`Search ${role === 'admin' ? 'admins' : 'users'} by name or email...`}
+            placeholder={`Search ${role === 'admin' ? 'admins' : 'PMOs'} by name or email...`}
             className="w-full py-2 px-2 outline-none"
             value={searchTerm}
             onChange={handleSearchChange}
@@ -250,7 +267,7 @@ export default function AccountList({ role, token, onCreateClick }) {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-gray-600">No {role === 'admin' ? 'admins' : 'users'} found matching "{searchTerm}"</p>
+              <p className="text-gray-600">No {role === 'admin' ? 'admins' : 'PMOs'} found matching "{searchTerm}"</p>
               <button 
                 onClick={clearSearch} 
                 className="mt-2 text-blue-600 hover:text-blue-800 font-medium"
@@ -263,7 +280,7 @@ export default function AccountList({ role, token, onCreateClick }) {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
-              <p className="text-gray-600">No {role === 'admin' ? 'admins' : 'users'} found</p>
+              <p className="text-gray-600">No {role === 'admin' ? 'admins' : 'PMOs'} found</p>
             </div>
           )}
         </div>
@@ -475,7 +492,15 @@ export default function AccountList({ role, token, onCreateClick }) {
           onClose={() => { setEditAccount(null); fetchAccounts(); }}
         />
       )}
+      {/* CreateUserModal for adding Admin/PMO */}
+      {showCreateModal && (
+        <CreateUserModal
+          open={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          role={role}
+          fetchAccounts={fetchAccounts}
+        />
+      )}
     </div>
   );
 }
-

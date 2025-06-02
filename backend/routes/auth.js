@@ -6,7 +6,7 @@ import { ROLES } from '../models.js';
 
 const router = express.Router();
 
-// Signup route (only for regular users)
+// Signup route (only for regular "pmo"s)
 router.post('/signup', async (req, res) => {
   const { email, password, profile_picture, first_name, last_name, office_unit } = req.body;
   if (!email || !password) {
@@ -23,12 +23,12 @@ router.post('/signup', async (req, res) => {
   try {
     await pool.query(
       'INSERT INTO users (email, password, role, first_name, last_name, profile_picture, office_unit) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [email, hashed, ROLES.USER, first_name || '', last_name || '', profilePic, office_unit || '']
+      [email, hashed, ROLES.PMO, first_name || '', last_name || '', profilePic, office_unit || '']
     );
-    res.status(201).json({ success: true, message: 'User registered successfully.' });
+    res.status(201).json({ success: true, message: 'Account registered successfully.' });
   } catch (err) {
-    console.error('Error creating user:', err);
-    res.status(500).json({ success: false, message: 'Server error. Failed to create user.' });
+    console.error('Error creating "pmo":', err);
+    res.status(500).json({ success: false, message: 'Server error. Failed to create "pmo".' });
   }
 });
 
@@ -50,12 +50,12 @@ router.post('/login', async (req, res) => {
   const token = jwt.sign(
     { id: user.id, email: user.email, role: user.role },
     process.env.JWT_SECRET,
-    { expiresIn: '8h' } // Increased to 8 hours for better user experience
+    { expiresIn: '8h' } // Increased to 8 hours for better "pmo" experience
   );
   res.json({ token, role: user.role });
 });
 
-// Middleware to check JWT and extract user info
+// Middleware to check JWT and extract "pmo" info
 function authenticateJWT(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader) return res.status(401).json({ message: 'No token provided.' });
@@ -70,8 +70,8 @@ function authenticateJWT(req, res, next) {
 
 export { authenticateJWT };
 
-// Admin/superadmin creates user or admin
-router.post('/create-user', authenticateJWT, async (req, res) => {
+// Admin/superadmin creates "pmo" or admin
+router.post('/create-pmo', authenticateJWT, async (req, res) => {
   const { email, password, role, first_name, last_name, profile_picture, office_unit } = req.body;
   if (/\s/.test(email)) {
     return res.status(400).json({ message: 'Email must not contain spaces.' });
@@ -82,12 +82,12 @@ router.post('/create-user', authenticateJWT, async (req, res) => {
   if (!office_unit) {
     return res.status(400).json({ message: 'Office/Unit is required.' });
   }
-  // Only superadmin can create admins, admin can only create users
-  if (req.user.role === ROLES.ADMIN && role !== ROLES.USER) {
-    return res.status(403).json({ message: 'Admins can only create users.' });
+  // Only superadmin can create admins, admin can only create "pmo"s
+  if (req.user.role === ROLES.ADMIN && role !== ROLES.PMO) {
+    return res.status(403).json({ message: 'Admins can only create "pmo"s.' });
   }
   if (req.user.role !== ROLES.SUPERADMIN && req.user.role !== ROLES.ADMIN) {
-    return res.status(403).json({ message: 'Only admins or superadmins can create users.' });
+    return res.status(403).json({ message: 'Only admins or superadmins can create PMOs.' });
   }
   // Prevent duplicate emails within the same role
   const existing = await pool.query('SELECT * FROM users WHERE email = $1 AND role = $2', [email, role]);
@@ -105,12 +105,12 @@ router.post('/create-user', authenticateJWT, async (req, res) => {
     
     res.status(201).json({ 
       success: true, 
-      message: 'User created successfully.',
+      message: 'Account created successfully.',
       id: result.rows[0].id
     });
   } catch (err) {
-    console.error('Error creating user:', err);
-    res.status(500).json({ success: false, message: 'Server error. Failed to create user.' });
+    console.error('Error creating "pmo":', err);
+    res.status(500).json({ success: false, message: 'Server error. Failed to create "pmo".' });
   }
 });
 
@@ -128,15 +128,15 @@ router.get('/check-email', async (req, res) => {
   }
 });
 
-// List all users or admins
+// List all "pmo"s or admins
 router.get('/accounts', authenticateJWT, async (req, res) => {
   const { role } = req.query;
   // Allow only admins and superadmins to fetch accounts
   if (!['admin', 'superadmin'].includes(req.user.role)) {
     return res.status(403).json({ message: 'Forbidden' });
   }
-  if (!role || (role !== 'user' && role !== 'admin')) {
-    return res.status(400).json({ message: 'Role must be user or admin.' });
+  if (!role || (role !== 'pmo' && role !== 'admin')) {
+    return res.status(400).json({ message: 'Role must be pmo or admin.' });
   }
   try {
     const results = await pool.query('SELECT id, email, role, first_name, last_name, profile_picture, office_unit FROM users WHERE role = $1 ORDER BY email', [role]);
@@ -146,11 +146,11 @@ router.get('/accounts', authenticateJWT, async (req, res) => {
   }
 });
 
-// Update user/admin
+// Update "pmo"/admin
 router.put('/account/:id', authenticateJWT, async (req, res) => {
   let id = req.params.id;
   
-  // Handle the "me" route - use the authenticated user's ID
+  // Handle the "me" route - use the authenticated "pmo"'s ID
   if (id === 'me') {
     id = req.user.id;
   }
@@ -163,9 +163,9 @@ router.put('/account/:id', authenticateJWT, async (req, res) => {
     return res.status(400).json({ message: 'Nothing to update.' });
   }
   try {
-    // Only allow users to change their own password with current password
+    // Only allow "pmo"s to change their own password with current password
     if (password) {
-      if (req.user.role === 'user' && (req.user.id === id || id === 'me')) {
+      if (req.user.role === 'pmo' && (req.user.id === id || id === 'me')) {
         if (!currentPassword) {
           return res.status(400).json({ message: 'Current password required.' });
         }
@@ -219,7 +219,7 @@ router.post('/account/:id/reset-password', authenticateJWT, async (req, res) => 
   
   // Set appropriate default password based on role
   const accountRole = userRes.rows[0].role;
-  const defaultPassword = accountRole === 'admin' ? 'admin123' : 'userpassword';
+  const defaultPassword = accountRole === 'admin' ? 'admin123' : 'pmopassword';
   
   const hashedPassword = await bcrypt.hash(defaultPassword, 10);
   await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, id]);
@@ -264,7 +264,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Get user profile
+// Get "pmo" profile
 router.get('/profile', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -284,7 +284,7 @@ router.get('/profile', authenticateJWT, async (req, res) => {
   }
 });
 
-// Update current user's own profile
+// Update current "pmo"'s own profile
 router.put('/profile', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -381,7 +381,7 @@ router.post('/profile/reset-password', authenticateJWT, async (req, res) => {
   }
 });
 
-// Validate token endpoint - accessible to all authenticated users
+// Validate token endpoint - accessible to all authenticated "pmo"s
 router.get('/validate-token', authenticateJWT, async (req, res) => {
   try {
     // If authenticateJWT middleware passes, the token is valid
@@ -400,28 +400,63 @@ router.get('/validate-token', authenticateJWT, async (req, res) => {
 });
 
 // POST /api/auth/upload-profile-picture
-router.post('/upload-profile-picture', authenticateJWT, upload.single('profile_picture'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded.' });
-  }
-
-  // If userId is provided and the logged-in user is admin/superadmin, update that user's profile_picture
-  if (req.body.userId) {
-    if (req.user.role === 'admin' || req.user.role === 'superadmin') {
-      const userId = req.body.userId;
-      const filename = req.file.filename;
-      try {
-        await pool.query('UPDATE users SET profile_picture = $1 WHERE id = $2', [filename, userId]);
-        return res.json({ success: true, filename });
-      } catch (err) {
-        return res.status(500).json({ message: 'Server error' });
+router.post('/upload-profile-picture', authenticateJWT, (req, res, next) => {
+  // Custom multer error handler to log errors
+  upload.single('profile_picture')(req, res, function (err) {
+    if (err) {
+      console.error('[UPLOAD PROFILE PICTURE] Multer error:', err);
+      return res.status(500).json({ message: 'Multer error', error: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    console.log('[UPLOAD PROFILE PICTURE] req.body:', req.body);
+    console.log('[UPLOAD PROFILE PICTURE] req.file:', req.file);
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded.' });
+    }
+    // If userId is provided and the logged-in "pmo" is admin/superadmin, update that "pmo"'s profile_picture
+    if (req.body.userId) {
+      if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+        const userId = req.body.userId;
+        const filename = req.file.filename;
+        try {
+          await pool.query('UPDATE users SET profile_picture = $1 WHERE id = $2', [filename, userId]);
+          return res.json({ success: true, filename });
+        } catch (err) {
+          console.error('[UPLOAD PROFILE PICTURE] DB error:', err.stack || err);
+          return res.status(500).json({ message: 'Server error', error: err.message });
+        }
+      } else {
+        return res.status(403).json({ message: 'Not authorized to upload for another "pmo".' });
       }
     } else {
-      return res.status(403).json({ message: 'Not authorized to upload for another user.' });
+      // No userId: just return the filename, do NOT update any "pmo"
+      return res.json({ success: true, filename: req.file.filename });
     }
-  } else {
-    // No userId: just return the filename, do NOT update any user
-    return res.json({ success: true, filename: req.file.filename });
+  } catch (err) {
+    console.error('[UPLOAD PROFILE PICTURE] Unexpected error:', err.stack || err);
+    return res.status(500).json({ message: 'Unexpected server error', error: err.message });
+  }
+});
+
+// GET /api/auth/accounts?role=admin or role=pmo
+router.get('/accounts', authenticateJWT, async (req, res) => {
+  const { role } = req.query;
+  if (!role || !['admin', 'pmo'].includes(role)) {
+    return res.status(400).json({ message: 'Role query param required (admin or pmo).' });
+  }
+  try {
+    // Query all users with the requested role, including main admin/pmo
+    const usersRes = await pool.query(
+      'SELECT id, email, role, office_unit, first_name, last_name, profile_picture, created_at FROM users WHERE role = $1 ORDER BY created_at ASC',
+      [role]
+    );
+    return res.json(usersRes.rows);
+  } catch (err) {
+    console.error('Error fetching accounts:', err);
+    return res.status(500).json({ message: 'Server error fetching accounts.' });
   }
 });
 
