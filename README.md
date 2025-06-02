@@ -1,5 +1,40 @@
 # DOST Monthly Consumption Monitoring System
 
+## Version 2.0.1 (June 2, 2025)
+
+**Release Highlights:**
+- Bug fixes for password fields, Office/Unit dropdown, and profile picture upload
+- Improved UI for password and confirm password fields (show/hide toggles, layout fixes)
+- Consistent default password logic and helper text based on user role
+- Better error handling and logging for uploads and authentication
+- No breaking database changes from v2.0.0
+
+**Upgrade Guide (from v2.0.0 to v2.0.1):**
+1. Pull the latest code from the repository:
+   ```
+   git pull origin master
+   git checkout v2.0.1
+   ```
+2. No new database migrations are required if you are already on v2.0.0.
+3. Update dependencies as needed:
+   ```
+   cd backend
+   npm install
+   cd ../frontend
+   npm install
+   ```
+4. Start the backend and frontend as usual.
+
+**Changelog:**
+- Fixed: Duplicate and missing Office/Unit dropdown in user creation modal
+- Fixed: Duplicate Confirm Password field and "Use Default" button
+- Added: Show/Hide password toggle for both password fields
+- Improved: Default password logic and UI helper text per user role
+- Improved: Error logging for file uploads and authentication
+- Security: Prevented unauthorized requests for account lists
+
+---
+
 ## Version 2.0.0 (May 30, 2025)
 
 A major update to the DOST Monthly Consumption Monitoring System, introducing an inventory system for electric-consuming items and various improvements. This guide will help pmos upgrade from version 1.0.0 to 2.0.0.
