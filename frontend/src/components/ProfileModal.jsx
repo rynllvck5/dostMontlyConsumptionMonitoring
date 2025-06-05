@@ -7,11 +7,12 @@ export default function ProfileModal({ user, open, onClose }) {
   const [email, setEmail] = useState(user.email || "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [officeUnit, setOfficeUnit] = useState("");
+  const [officeId, setOfficeId] = useState("");
+  const [officeName, setOfficeName] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [profilePicture, setProfilePicture] = useState("/images/default-profile.jpg");
+  const [profilePicture, setProfilePicture] = useState("/images/uploaded-profile-pics/default-profile.jpg");
   const [profilePicFile, setProfilePicFile] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -24,18 +25,46 @@ export default function ProfileModal({ user, open, onClose }) {
   const [resetError, setResetError] = useState("");
   const fileInputRef = useRef();
 
-  // Office unit options sorted alphabetically
-  const officeUnitOptions = [
-    "DOST-Ilocos Norte",
-    "DOST-Ilocos Sur FO",
-    "DOST-Ilocos Sur Main",
-    "DOST-La Union NEW",
-    "DOST-La Union OLD",
-    "DOST-Pangasinan FO",
-    "DOST-Pangasinan MAIN",
-    "Regional Office",
-    "RSTL"
-  ];
+  // Office options fetched from backend
+  const [offices, setOffices] = useState([]);
+  const [officesLoading, setOfficesLoading] = useState(true);
+  const [officesError, setOfficesError] = useState("");
+
+  // Handle office dropdown change
+  const handleOfficeChange = (e) => {
+    const selectedOfficeId = e.target.value;
+    setOfficeId(selectedOfficeId);
+    const selectedOffice = offices.find(office => String(office.office_id) === String(selectedOfficeId));
+    setOfficeName(selectedOffice ? selectedOffice.name : "");
+  };
+
+  // Fetch office list on modal open
+  useEffect(() => {
+    if (!open) return;
+    const fetchOfficeOptions = async () => {
+      setOfficesLoading(true);
+      setOfficesError("");
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) throw new Error("Not logged in");
+        // Dynamic import to avoid circular deps
+        const api = await import("../api.js");
+        const result = await api.fetchOffices(token);
+        if (Array.isArray(result)) {
+          setOffices(result);
+        } else {
+          setOffices([]);
+          setOfficesError("Failed to load office list.");
+        }
+      } catch (e) {
+        setOffices([]);
+        setOfficesError("Failed to load office list.");
+      } finally {
+        setOfficesLoading(false);
+      }
+    };
+    fetchOfficeOptions();
+  }, [open]);
 
   // Fetch user profile data
   useEffect(() => {
@@ -59,12 +88,13 @@ export default function ProfileModal({ user, open, onClose }) {
           setEmail(userData.email || "");
           setFirstName(userData.first_name || "");
           setLastName(userData.last_name || "");
-          setOfficeUnit(userData.office_unit || "");
+          setOfficeId(userData.office_id || "");
+          setOfficeName(userData.office_name || "");
           
           if (userData.profile_picture) {
-            setProfilePicture(`/images/${userData.profile_picture}`);
+            setProfilePicture(`/images/uploaded-profile-pics/${userData.profile_picture}`);
           } else {
-            setProfilePicture("/images/default-profile.jpg");
+            setProfilePicture("/images/uploaded-profile-pics/default-profile.jpg");
           }
         } else if (response.status === 403) {
           handleTokenError("Invalid token");
@@ -109,8 +139,8 @@ export default function ProfileModal({ user, open, onClose }) {
       }
     }
 
-    if (!officeUnit) {
-      setError("Please select an Office/Unit");
+    if (!officeId) {
+      setError("Please select an Office");
       setSaving(false);
       return;
     }
@@ -155,7 +185,7 @@ export default function ProfileModal({ user, open, onClose }) {
         email: email,
         first_name: firstName,
         last_name: lastName,
-        office_unit: officeUnit
+        office_id: officeId
       };
 
       if (newPassword) {
@@ -218,7 +248,7 @@ export default function ProfileModal({ user, open, onClose }) {
                   src={profilePicture}
                   alt="Profile"
                   className="w-24 h-24 rounded-full object-cover border-2 border-blue-500 shadow-md transition-all duration-300 group-hover:opacity-80"
-                  onError={(e) => { e.target.src = "/images/default-profile.jpg"; }}
+                  onError={(e) => { e.target.src = "/images/uploaded-profile-pics/default-profile.jpg"; }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                   <div className="bg-black bg-opacity-60 rounded-full p-2 transform group-hover:scale-110 transition-transform">
@@ -271,21 +301,7 @@ export default function ProfileModal({ user, open, onClose }) {
               />
             </div>
             
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Office/Unit</label>
-              <select
-                className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                value={officeUnit}
-                onChange={(e) => setOfficeUnit(e.target.value)}
-              >
-                <option value="">Select an Office/Unit</option>
-                {officeUnitOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
+
             
             <div className="border-t border-gray-200 my-6 pt-6">
               <div className="flex justify-between items-center mb-4">
@@ -454,7 +470,7 @@ export default function ProfileModal({ user, open, onClose }) {
                     src={profilePicture}
                     alt="Profile"
                     className="w-64 h-64 rounded-lg object-cover shadow-lg border-2 border-gray-200"
-                    onError={(e) => { e.target.src = "/images/default-profile.jpg"; }}
+                    onError={(e) => { e.target.src = "/images/uploaded-profile-pics/default-profile.jpg"; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex flex-col justify-end p-3">
                     <p className="text-white text-sm">Click below to change your profile picture</p>

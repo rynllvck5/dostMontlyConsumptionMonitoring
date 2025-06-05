@@ -5,7 +5,7 @@ const ConsumptionItemForm = ({ item, onSubmit, onClose, periods, successMessage 
   const [itemName, setItemName] = useState(item?.item_name || '');
   const [kilowatts, setKilowatts] = useState(item?.kilowatts || '');
   const [quantity, setQuantity] = useState(item?.quantity || 1);
-  const [period, setPeriod] = useState(item?.period || 'per hour');
+  const [itemModel, setItemModel] = useState(item?.item_model || '');
   const [images, setImages] = useState(item?.images || []);
   const [deletedImages, setDeletedImages] = useState([]);
   const [error, setError] = useState('');
@@ -38,7 +38,7 @@ const ConsumptionItemForm = ({ item, onSubmit, onClose, periods, successMessage 
       formData.append('item_name', itemName.trim());
       formData.append('kilowatts', kilowatts);
       formData.append('quantity', quantity);
-      formData.append('period', period);
+      formData.append('item_model', itemModel);
       
       // Append only File objects (new images)
       const newImages = images.filter(image => image instanceof File);
@@ -121,14 +121,13 @@ const ConsumptionItemForm = ({ item, onSubmit, onClose, periods, successMessage 
         />
       </div>
       <div>
-        <label className="block mb-1 font-semibold text-gray-700">Period</label>
-        <select
+        <label className="block mb-1 font-semibold text-gray-700">Item Model</label>
+        <input
           className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-          value={period}
-          onChange={e => setPeriod(e.target.value)}
-        >
-          {periods.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+          value={itemModel}
+          onChange={e => setItemModel(e.target.value)}
+          placeholder="e.g. Intel(R) Core(TM) i7-14700HX (28 CPUs), ~2.1GHz"
+        />
       </div>
       
       <ImageUpload

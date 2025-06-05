@@ -4,7 +4,8 @@ export default function CreateUserModal({ open, onClose, onCreate, role, fetchAc
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [officeUnit, setOfficeUnit] = useState("");
+  const [officeId, setOfficeId] = useState("");
+  const [offices, setOffices] = useState([]);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -13,22 +14,23 @@ export default function CreateUserModal({ open, onClose, onCreate, role, fetchAc
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [profilePicFile, setProfilePicFile] = useState(null);
-  const [profilePicPreview, setProfilePicPreview] = useState('/images/default-profile.jpg');
+  const [profilePicPreview, setProfilePicPreview] = useState('/images/uploaded-profile-pics/default-profile.jpg');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef();
 
-  // Office unit options sorted alphabetically
-  const officeUnitOptions = [
-    "DOST-Ilocos Norte",
-    "DOST-Ilocos Sur FO",
-    "DOST-Ilocos Sur Main",
-    "DOST-La Union NEW",
-    "DOST-La Union OLD",
-    "DOST-Pangasinan FO",
-    "DOST-Pangasinan MAIN",
-    "Regional Office",
-    "RSTL"
-  ];
+  // Fetch offices for dropdown
+  useEffect(() => {
+    async function loadOffices() {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await import('../api.js').then(api => api.fetchOffices(token));
+        setOffices(res);
+      } catch (e) {
+        setOffices([]);
+      }
+    }
+    if (open) loadOffices();
+  }, [open]);
 
   useEffect(() => {
   if (open) {
@@ -38,6 +40,11 @@ export default function CreateUserModal({ open, onClose, onCreate, role, fetchAc
 }, [open]);
 
 if (!open) return null;
+
+  // Office dropdown
+  const officeOptions = offices.map(office => (
+    <option key={office.office_id} value={office.office_id}>{office.name}</option>
+  ));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,8 +59,8 @@ if (!open) return null;
       setError("Passwords do not match.");
       return;
     }
-    if (!officeUnit) {
-      setError("Please select an Office/Unit.");
+    if (!officeId) {
+      setError("Please select an Office.");
       return;
     }
     
@@ -100,11 +107,11 @@ if (!open) return null;
         },
         body: JSON.stringify({
           email,
-          password,
-          role,
           first_name: firstName,
           last_name: lastName,
-          office_unit: officeUnit,
+          office_id: officeId,
+          password,
+          role,
           profile_picture: profilePicFilename
         })
       });
@@ -156,7 +163,7 @@ if (!open) return null;
                 src={profilePicPreview}
                 alt="Profile Preview"
                 className="w-24 h-24 rounded-full border mb-2 object-cover transition-all duration-300 group-hover:opacity-75 group-hover:shadow-lg"
-                onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
+                onError={(e) => { e.target.src = '/images/uploaded-profile-pics/default-profile.jpg'; }}
               />
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <div className="bg-black bg-opacity-60 rounded-full p-2 transform group-hover:scale-110 transition-transform">
@@ -199,7 +206,7 @@ if (!open) return null;
                         src={profilePicPreview}
                         alt="Profile Preview"
                         className="w-64 h-64 rounded-lg object-cover shadow-lg border-2 border-gray-200"
-                        onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
+                        onError={(e) => { e.target.src = '/images/uploaded-profile-pics/default-profile.jpg'; }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex flex-col justify-end p-3">
                         <p className="text-white text-sm">Click below to change your profile picture</p>
@@ -250,17 +257,15 @@ if (!open) return null;
             />
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Office/Unit</label>
+            <label className="block text-sm font-medium text-gray-700">Office</label>
             <select
-              className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-              value={officeUnit}
-              onChange={e => setOfficeUnit(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              value={officeId}
+              onChange={e => setOfficeId(e.target.value === "" ? "" : Number(e.target.value))}
               required
             >
-              <option value="">Select Office/Unit</option>
-              {officeUnitOptions.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
+              <option key="default-office-option" value="">Select Office</option>
+              {officeOptions}
             </select>
           </div>
 

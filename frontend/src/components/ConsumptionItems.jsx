@@ -3,7 +3,7 @@ import {
   getConsumptionItems,
   createConsumptionItem,
   updateConsumptionItem,
-  deleteConsumptionItem
+  archiveConsumptionItem
 } from '../api';
 
 function ItemModal({ open, onClose, onSubmit, initialData }) {
@@ -118,17 +118,18 @@ function ConsumptionItems({ token }) {
     setLoading(false);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return;
+  const handleArchive = async (id) => {
+    if (!window.confirm('Are you sure you want to archive this item?')) return;
     setLoading(true);
     try {
-      await deleteConsumptionItem({ id, token });
+      await archiveConsumptionItem({ id, token });
       fetchItems();
     } catch (e) {
-      setError('Failed to delete item.');
+      setError('Failed to archive item.');
     }
     setLoading(false);
   };
+
 
   return (
     <div className="p-6">

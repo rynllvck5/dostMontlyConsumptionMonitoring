@@ -4,11 +4,15 @@ import Login from './Login.jsx';
 // import Signup from './Signup.jsx';
 import Sidebar from './components/Sidebar';
 import ConsumptionItemsSection from './components/ConsumptionItemsSection';
+import ArchivedItemsSection from './components/ArchivedItemsSection';
 import AccountList from './components/AccountList';
 
 import Header from './components/Header';
 import FuelConsumption from './FuelConsumption';
 import ElectricityConsumption from './ElectricityConsumption';
+import Settings from './components/Settings/Settings';
+import SettingsProfile from './components/Settings/SettingsProfile';
+import SettingsOffice from './components/Settings/SettingsOffice';
 
 // Chevron button for mini-sidebar (right)
 const MiniSidebarButton = ({ onClick }) => (
@@ -99,9 +103,13 @@ function AppShell() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ... (rest of the logic is unchanged)
+  // Track last non-settings route for settings back button
+  React.useEffect(() => {
+    if (!location.pathname.includes('/settings')) {
+      sessionStorage.setItem('last_non_settings_path', location.pathname);
+    }
+  }, [location.pathname]);
 
-  
   // Responsive sidebar toggle
   React.useEffect(() => {
     const handleResize = () => {
@@ -200,7 +208,7 @@ function AppShell() {
     localStorage.removeItem('firstName');
     localStorage.removeItem('lastName');
     localStorage.removeItem('userId');
-    setView('login');
+    navigate('/login');
   };
 
   // On mount: if token, fetch profile for first/last name
@@ -237,29 +245,37 @@ function AppShell() {
   if (token && role) {
     // Compute full name for sidebar
     const fullName = (firstName || lastName) ? `${firstName} ${lastName}`.trim() : email;
+    // Hide Sidebar and Header on settings routes
+    const isSettingsRoute = location.pathname.startsWith('/pmo/settings');
     return (
       <div className="flex h-screen">
-        <Sidebar
-          role={role}
-          fullName={fullName}
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          onLogout={handleLogout}
-        />
+        {!isSettingsRoute && (
+          <Sidebar
+            role={role}
+            fullName={fullName}
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(!sidebarOpen)}
+            onLogout={handleLogout}
+          />
+        )}
         <div className="flex-1 flex flex-col min-w-0">
-           <Header
-             fullName={fullName}
-             email={email}
-             role={role}
-             onProfile={() => setProfileOpen(true)}
-             onSidebarToggle={() => setSidebarOpen((v) => !v)}
-           />
-           {/* Profile modal always available and controlled by state */}
-           <ProfileModal 
-             user={{ email, firstName, lastName, role }}
-             open={profileOpen}
-             onClose={() => setProfileOpen(false)}
-           />
+          {!isSettingsRoute && (
+            <Header
+              fullName={fullName}
+              email={email}
+              role={role}
+              onProfile={() => setProfileOpen(true)}
+              onSidebarToggle={() => setSidebarOpen((v) => !v)}
+            />
+          )}
+          {/* Profile modal always available and controlled by state */}
+          {!isSettingsRoute && (
+            <ProfileModal 
+              user={{ email, firstName, lastName, role }}
+              open={profileOpen}
+              onClose={() => setProfileOpen(false)}
+            />
+          )}
           <main className="flex-1 overflow-y-auto bg-gray-100 px-2 md:px-6 py-4">
             <Routes>
                 <Route path="/" element={token ? <Navigate to={`/${role}/home`} /> : <Login onLogin={handleSwitchView} />} />
@@ -269,6 +285,12 @@ function AppShell() {
                 <Route path="/pmo/fuel-consumption" element={<FuelConsumption />} />
                 <Route path="/pmo/electricity-consumption" element={<ElectricityConsumption />} />
                 <Route path="/pmo/item-inventory" element={<ConsumptionItemsSection token={token} />} />
+<Route path="/pmo/archived-items" element={<ArchivedItemsSection token={token} />} />
+                <Route path="/pmo/settings" element={<Settings />}>
+                  <Route index element={<Navigate to="profile" replace />} />
+                  <Route path="profile" element={<SettingsProfile />} />
+                  <Route path="office" element={<SettingsOffice />} />
+                </Route>
                 {/* Admin Routes */}
                 <Route path="/admin/home" element={<DashboardContent role="admin" view="home" />} />
                 <Route path="/admin/item-inventory" element={<ConsumptionItemsSection token={token} />} />
@@ -278,7 +300,7 @@ function AppShell() {
                 <Route path="/superadmin/admin-management" element={<AccountList role="admin" />} />
                 <Route path="/superadmin/user-management" element={<AccountList role="pmo" />} />
                 {/* Fallback */}
-                <Route path="*" element={<Navigate to={token && role ? `/${role}/home` : '/login'} />} />
+                <Route path="*" element={<Navigate to={token && role ? location.pathname : '/login'} />} />
               </Routes>
             </main>
           </div>

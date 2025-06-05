@@ -8,7 +8,7 @@ const router = express.Router();
 
 // Signup route (only for regular "pmo"s)
 router.post('/signup', async (req, res) => {
-  const { email, password, profile_picture, first_name, last_name, office_unit } = req.body;
+  const { email, password, profile_picture, first_name, last_name, office_id } = req.body;
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password required.' });
   }
@@ -22,8 +22,8 @@ router.post('/signup', async (req, res) => {
   
   try {
     await pool.query(
-      'INSERT INTO users (email, password, role, first_name, last_name, profile_picture, office_unit) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [email, hashed, ROLES.PMO, first_name || '', last_name || '', profilePic, office_unit || '']
+      'INSERT INTO users (email, password, role, first_name, last_name, profile_picture, office_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [email, hashed, ROLES.PMO, first_name || '', last_name || '', profilePic, office_id || null]
     );
     res.status(201).json({ success: true, message: 'Account registered successfully.' });
   } catch (err) {
@@ -72,14 +72,14 @@ export { authenticateJWT };
 
 // Admin/superadmin creates "pmo" or admin
 router.post('/create-pmo', authenticateJWT, async (req, res) => {
-  const { email, password, role, first_name, last_name, profile_picture, office_unit } = req.body;
+  const { email, password, role, first_name, last_name, profile_picture, office_id } = req.body;
   if (/\s/.test(email)) {
     return res.status(400).json({ message: 'Email must not contain spaces.' });
   }
   if (!email || !password || !role) {
     return res.status(400).json({ message: 'Email, password, and role are required.' });
   }
-  if (!office_unit) {
+  if (!office_id) {
     return res.status(400).json({ message: 'Office/Unit is required.' });
   }
   // Only superadmin can create admins, admin can only create "pmo"s
@@ -99,8 +99,8 @@ router.post('/create-pmo', authenticateJWT, async (req, res) => {
   
   try {
     const result = await pool.query(
-      'INSERT INTO users (email, password, role, first_name, last_name, profile_picture, office_unit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-      [email, hashed, role, first_name || '', last_name || '', profilePic, office_unit]
+      'INSERT INTO users (email, password, role, first_name, last_name, profile_picture, office_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      [email, hashed, role, first_name || '', last_name || '', profilePic, office_id]
     );
     
     res.status(201).json({ 
@@ -139,8 +139,38 @@ router.get('/accounts', authenticateJWT, async (req, res) => {
     return res.status(400).json({ message: 'Role must be pmo or admin.' });
   }
   try {
-    const results = await pool.query('SELECT id, email, role, first_name, last_name, profile_picture, office_unit FROM users WHERE role = $1 ORDER BY email', [role]);
+    const results = await pool.query(`
+      SELECT users.id, users.email, users.role, users.first_name, users.last_name, users.profile_picture, users.office_id, offices.name AS office_name
+      FROM users
+      LEFT JOIN offices ON users.office_id = offices.office_id
+      WHERE users.role = $1
+      ORDER BY users.email
+    `, [role]);
     res.json(results.rows);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get a single account by ID
+router.get('/accounts/:id', authenticateJWT, async (req, res) => {
+  const id = req.params.id;
+  // Only admins and superadmins can fetch accounts
+  if (!['admin', 'superadmin'].includes(req.user.role)) {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  try {
+    const result = await pool.query(`
+      SELECT users.id, users.email, users.role, users.first_name, users.last_name, users.profile_picture, users.office_id, offices.name AS office_name
+      FROM users
+      LEFT JOIN offices ON users.office_id = offices.office_id
+      WHERE users.id = $1
+      LIMIT 1
+    `, [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -155,11 +185,11 @@ router.put('/account/:id', authenticateJWT, async (req, res) => {
     id = req.user.id;
   }
   
-  const { email, password, currentPassword, first_name, last_name, profile_picture, office_unit } = req.body;
+  const { email, password, currentPassword, first_name, last_name, profile_picture, office_id } = req.body;
   if (email && /\s/.test(email)) {
     return res.status(400).json({ message: 'Email must not contain spaces.' });
   }
-  if (!email && !password && !first_name && !last_name && !profile_picture && !office_unit) {
+  if (!email && !password && !first_name && !last_name && !profile_picture && !office_id) {
     return res.status(400).json({ message: 'Nothing to update.' });
   }
   try {
@@ -182,9 +212,9 @@ router.put('/account/:id', authenticateJWT, async (req, res) => {
     if (first_name !== undefined || last_name !== undefined) {
       await pool.query('UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3', [first_name || '', last_name || '', id]);
     }
-    // Update office_unit if provided
-    if (office_unit !== undefined) {
-      await pool.query('UPDATE users SET office_unit = $1 WHERE id = $2', [office_unit, id]);
+    // Update office_id if provided
+    if (office_id !== undefined) {
+      await pool.query('UPDATE users SET office_id = $1 WHERE id = $2', [office_id, id]);
     }
     if (email) {
       // Check if the email already exists for a different account
@@ -251,11 +281,21 @@ router.delete('/account/:id', authenticateJWT, async (req, res) => {
 
 // Profile picture upload endpoint
 import multer from 'multer';
+import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, path.resolve('../frontend/public/images'));
+    const uploadDir = path.resolve(__dirname, '../../frontend/public/images/uploaded-profile-pics');
+    // Ensure directory exists
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -264,14 +304,27 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+// Get all offices
+router.get('/offices', authenticateJWT, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT office_id, name FROM offices ORDER BY name ASC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching offices:', err);
+    res.status(500).json({ message: 'Server error fetching offices.' });
+  }
+});
+
 // Get "pmo" profile
 router.get('/profile', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
-    const result = await pool.query(
-      'SELECT id, email, role, first_name, last_name, profile_picture, office_unit FROM users WHERE id = $1',
-      [userId]
-    );
+    const result = await pool.query(`
+      SELECT users.id, users.email, users.role, users.first_name, users.last_name, users.profile_picture, users.office_id, offices.name AS office_name
+      FROM users
+      LEFT JOIN offices ON users.office_id = offices.office_id
+      WHERE users.id = $1
+    `, [userId]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
@@ -288,10 +341,10 @@ router.get('/profile', authenticateJWT, async (req, res) => {
 router.put('/profile', authenticateJWT, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { email, first_name, last_name, password, currentPassword, profile_picture, office_unit } = req.body;
+    const { email, first_name, last_name, password, currentPassword, profile_picture, office_id } = req.body;
     
     // Check if there's anything to update
-    if (!email && !first_name && !last_name && !password && !profile_picture && !office_unit) {
+    if (!email && !first_name && !last_name && !password && !profile_picture && !office_id) {
       return res.status(400).json({ message: 'Nothing to update' });
     }
     
@@ -335,9 +388,9 @@ router.put('/profile', authenticateJWT, async (req, res) => {
       );
     }
     
-    // Update office_unit if provided
-    if (office_unit !== undefined) {
-      await pool.query('UPDATE users SET office_unit = $1 WHERE id = $2', [office_unit, userId]);
+    // Update office_id if provided
+    if (office_id !== undefined) {
+      await pool.query('UPDATE users SET office_id = $1 WHERE id = $2', [office_id, userId]);
     }
     
     // Update profile picture if provided
@@ -375,6 +428,31 @@ router.post('/profile/reset-password', authenticateJWT, async (req, res) => {
       success: true,
       message: 'Password has been reset to default successfully'
     });
+  } catch (err) {
+    console.error('Error resetting password:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Reset password for admin or pmo
+router.post('/reset-password', authenticateJWT, async (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ message: 'Missing user id.' });
+  // Only admin/superadmin can reset passwords
+  if (!['admin', 'superadmin'].includes(req.user.role)) {
+    return res.status(403).json({ message: 'Not authorized.' });
+  }
+  try {
+    const userRes = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
+    if (userRes.rows.length === 0) return res.status(404).json({ message: 'User not found.' });
+    const role = userRes.rows[0].role;
+    let newPassword = '';
+    if (role === 'admin') newPassword = 'admin123';
+    else if (role === 'pmo') newPassword = 'pmopassword';
+    else return res.status(400).json({ message: 'Only admin or pmo passwords can be reset.' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, id]);
+    res.json({ success: true });
   } catch (err) {
     console.error('Error resetting password:', err);
     res.status(500).json({ message: 'Server error' });
@@ -450,7 +528,11 @@ router.get('/accounts', authenticateJWT, async (req, res) => {
   try {
     // Query all users with the requested role, including main admin/pmo
     const usersRes = await pool.query(
-      'SELECT id, email, role, office_unit, first_name, last_name, profile_picture, created_at FROM users WHERE role = $1 ORDER BY created_at ASC',
+      `SELECT u.id, u.email, u.role, u.office_id, o.office_name, u.first_name, u.last_name, u.profile_picture, u.created_at
+       FROM users u
+       LEFT JOIN offices o ON u.office_id = o.id
+       WHERE u.role = $1
+       ORDER BY u.created_at ASC`,
       [role]
     );
     return res.json(usersRes.rows);

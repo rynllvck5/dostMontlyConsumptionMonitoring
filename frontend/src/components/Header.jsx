@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 
 // Header is sticky and styled for modern UX
 export default function Header({ fullName, email, role, onProfile, onLogout, onSidebarToggle }) {
-  const [profilePicture, setProfilePicture] = useState('/images/default-profile.jpg');
+  const [profilePicture, setProfilePicture] = useState('/images/uploaded-profile-pics/default-profile.jpg');
   
   // Fetch user profile data including profile picture
   useEffect(() => {
@@ -21,7 +21,7 @@ export default function Header({ fullName, email, role, onProfile, onLogout, onS
         if (response.ok) {
           const userData = await response.json();
           if (userData.profile_picture) {
-            setProfilePicture(`/images/${userData.profile_picture}`);
+            setProfilePicture(`/images/uploaded-profile-pics/${userData.profile_picture}`);
           }
         }
       } catch (error) {

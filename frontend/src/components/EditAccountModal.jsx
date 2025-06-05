@@ -8,7 +8,8 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
   const [email, setEmail] = useState(account.email);
   const [firstName, setFirstName] = useState(account.first_name || '');
   const [lastName, setLastName] = useState(account.last_name || '');
-  const [officeUnit, setOfficeUnit] = useState(account.office_unit || '');
+  const [officeId, setOfficeId] = useState(account.office_id || '');
+  const [offices, setOffices] = useState([]);
   const [password, setPassword] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,25 +19,26 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
     account.profile_picture 
       ? account.profile_picture.startsWith('http') 
         ? account.profile_picture 
-        : `/images/${account.profile_picture}` 
-      : '/images/default-profile.jpg'
+        : `/images/uploaded-profile-pics/${account.profile_picture}` 
+      : '/images/uploaded-profile-pics/default-profile.jpg'
   );
   const [profilePicFile, setProfilePicFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef();
 
-  // Office unit options sorted alphabetically
-  const officeUnitOptions = [
-    "DOST-Ilocos Norte",
-    "DOST-Ilocos Sur FO",
-    "DOST-Ilocos Sur Main",
-    "DOST-La Union NEW",
-    "DOST-La Union OLD",
-    "DOST-Pangasinan FO",
-    "DOST-Pangasinan MAIN",
-    "Regional Office",
-    "RSTL"
-  ];
+  // Fetch offices for dropdown
+  React.useEffect(() => {
+    async function loadOffices() {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await import('../api.js').then(api => api.fetchOffices(token));
+        setOffices(res);
+      } catch (e) {
+        setOffices([]);
+      }
+    }
+    loadOffices();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -48,8 +50,12 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
       setError('A valid email is required.');
       return;
     }
-    if (!officeUnit) {
-      setError('Please select an Office/Unit.');
+    if (!firstName || firstName.trim().length === 0) {
+      setError('First Name is required.');
+      return;
+    }
+    if (!officeId) {
+      setError('Please select an Office.');
       return;
     }
     try {
@@ -93,7 +99,7 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
           email,
           first_name: firstName,
           last_name: lastName,
-          office_unit: officeUnit,
+          office_id: officeId,
           password: password || undefined,
           currentPassword: (account.role === 'user' && editorRole === 'user') ? currentPassword : undefined,
           profile_picture: newProfilePicFilename || undefined
@@ -136,6 +142,8 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
       <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative">
         <h2 className="text-xl font-bold mb-4">Edit Account</h2>
         <form onSubmit={handleSubmit}>
+
+          {/* ...all form contents as previously structured... */}
           <div className="mb-4 flex flex-col items-center">
             <label className="block text-gray-700 font-medium mb-1">Profile Picture</label>
             <div className="relative group cursor-pointer" onClick={() => setShowImageModal(true)}>
@@ -143,7 +151,7 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
                 src={profilePicPreview}
                 alt="Profile Preview"
                 className="w-24 h-24 rounded-full border mb-2 object-cover transition-all duration-300 group-hover:opacity-75 group-hover:shadow-lg"
-                onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
+                onError={(e) => { e.target.src = '/images/uploaded-profile-pics/default-profile.jpg'; }}
               />
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <div className="bg-black bg-opacity-60 rounded-full p-2 transform group-hover:scale-110 transition-transform">
@@ -163,210 +171,190 @@ export default function EditAccountModal({ account, token, editorRole, onClose }
               className="hidden"
             />
             {uploading && <div className="text-blue-600 text-sm mt-1">Uploading...</div>}
-            
-            {/* Image Preview Modal */}
-            {showImageModal && (
-              <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50 animate-fadeIn">
-                <div className="bg-white rounded-lg p-6 max-w-lg w-full shadow-2xl transform transition-all animate-fadeIn">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Profile Picture</h3>
-                    <button 
-                      type="button" 
-                      className="text-gray-500 hover:text-gray-700 transition-colors"
-                      onClick={() => setShowImageModal(false)}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <div className="relative mb-6 group">
-                      <img
-                        src={profilePicPreview}
-                        alt="Profile Preview"
-                        className="w-64 h-64 rounded-lg object-cover shadow-lg border-2 border-gray-200"
-                        onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex flex-col justify-end p-3">
-                        <p className="text-white text-sm">Click below to change your profile picture</p>
-                      </div>
-                    </div>
-                    <button 
+          </div>
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-1">Email</label>
+          <input
+            type="text"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-1">First Name <span className="text-red-600">*</span></label>
+          <input
+            type="text"
+            value={firstName}
+            onChange={e => setFirstName(e.target.value)}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-1">Last Name</label>
+          <input
+            type="text"
+            value={lastName}
+            onChange={e => setLastName(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-1">Office</label>
+          <select
+            value={officeId}
+            onChange={e => setOfficeId(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select an office</option>
+            {offices.map(office => (
+              <option key={office.office_id} value={office.office_id}>
+                {office.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {/* New Password Field */}
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-1">New Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Enter new password."
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        {/* Reset Password Button - now below New Password */}
+        {(editorRole === 'admin' || editorRole === 'superadmin') && (
+          <div className="mb-4">
+            <button
+              type="button"
+              className="text-blue-600 text-sm hover:text-blue-800"
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+              disabled={resetting}
+              onClick={() => setShowResetConfirm(true)}
+            >Reset password</button>
+            {showResetConfirm && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
+    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+      {/* Success/Error Message for Reset Password */}
+
+      {error && (
+        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-md flex items-center justify-between animate-fadeIn">
+          <span className="text-red-700 font-medium">{error}</span>
+          <button onClick={() => setError("")} className="ml-4 text-red-700 hover:text-red-900 font-bold">&times;</button>
+        </div>
+      )}
+      <div className="mb-4 text-lg font-semibold text-gray-800 text-center">
+        <div>You are about to reset the password for:</div>
+        <div className="mt-2 text-base font-medium text-blue-700">
+          {account.email}
+          {account.first_name || account.last_name ? (
+            <span> &mdash; {account.first_name} {account.last_name}</span>
+          ) : null}
+        </div>
+        <div className="mt-4 text-base text-gray-700">The password will be set to:</div>
+        <div className="mt-1 mb-2 px-4 py-2 bg-gray-100 rounded font-mono text-lg text-blue-900 border border-blue-200 inline-block select-all">
+          {account.role === 'admin' ? 'admin123' : 'pmopassword'}
+        </div>
+      </div>
+      {resetting && (
+        <div className="text-blue-600 text-center mb-2">Resetting password...</div>
+      )}
+      <div className="flex justify-end gap-3 mt-6">
+                    <button
                       type="button"
+                      className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-medium transition-colors"
                       onClick={() => {
-                        fileInputRef.current.click();
-                        setShowImageModal(false);
+                        setShowResetConfirm(false);
+                        setError("");
+                        setSuccess("");
                       }}
-                      className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full hover:from-blue-600 hover:to-blue-700 shadow-md hover:shadow-lg transition-all duration-300 flex items-center gap-2 transform hover:scale-105"
+                      disabled={resetting}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
-                      </svg>
-                      Upload New Image
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-medium transition-colors"
+                      onClick={async () => {
+                        setResetting(true);
+                        setError("");
+                        setSuccess("");
+                        try {
+                          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+                          const currentToken = localStorage.getItem('token');
+                          const res = await fetch(`${API_URL}/reset-password`, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${currentToken}`
+                            },
+                            body: JSON.stringify({ id: account.id })
+                          });
+                          const data = await res.json();
+                          setResetting(false);
+                          if (data.success) {
+                            setSuccess('Password was reset to the default successfully.');
+                            setShowResetConfirm(false);
+                            setTimeout(() => {
+                              setSuccess("");
+                              
+                            }, 2000);
+                          } else {
+                            setError(data.message || 'Failed to reset password.');
+                          }
+                        } catch (err) {
+                          setResetting(false);
+                          setError('An unexpected error occurred.');
+                        }
+                      }}
+                      disabled={resetting}
+                    >
+                      Reset
                     </button>
                   </div>
                 </div>
               </div>
             )}
           </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-1">First Name</label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={e => setFirstName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-1">Last Name (optional)</label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={e => setLastName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-1">Email</label>
-            <input
-              type="text"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-1">Office/Unit</label>
-            <select
-              className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              value={officeUnit}
-              onChange={e => setOfficeUnit(e.target.value)}
-              required
-            >
-              <option value="">Select Office/Unit</option>
-              {officeUnitOptions.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* New Password section (single input for all roles) */}
-          <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-1">New Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Reset Password link/modal for admin/superadmin editing any account */}
-          {(editorRole === 'admin' || editorRole === 'superadmin') && (
-            <div className="mb-4">
+        )}
+        {/* Save/Cancel Buttons or Success/Error Message at Bottom */}
+        <div className="flex justify-end gap-3 mt-6 items-center min-h-[48px]">
+          {success ? (
+            <div className="w-full flex justify-center">
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-md text-green-700 font-medium animate-fadeIn w-full text-center">
+                {success}
+              </div>
+            </div>
+          ) : (
+            <>
               <button
                 type="button"
-                className="text-blue-600 text-sm hover:text-blue-800"
-                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                disabled={resetting}
-                onClick={() => setShowResetConfirm(true)}
-              >Reset password</button>
-              {showResetConfirm && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
-                  <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-                    <div className="mb-4 text-gray-800">
-                      Are you sure you want to reset this account password to the default?
-                      <div className="mt-2 p-3 bg-gray-100 rounded-md">
-                        <span className="font-medium">Default password for {account.role === 'admin' ? 'admin' : account.role === 'pmo' ? 'PMO' : 'user'} accounts: </span>
-                        <span className="font-semibold text-blue-700">{account.role === 'admin' ? 'admin123' : (account.role === 'pmo' ? 'pmopassword' : 'userpassword')}</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <button
-                        className="px-3 py-1 rounded bg-gray-300 hover:bg-gray-400 transition-colors"
-                        onClick={() => setShowResetConfirm(false)}
-                      >Cancel</button>
-                      <button
-                        className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                        disabled={resetting}
-                        onClick={async () => {
-                          setResetting(true);
-                          setError('');
-                          setSuccess('');
-                          try {
-                            const res = await fetch(`http://localhost:5000/api/auth/account/${account.id}/reset-password`, {
-                              method: 'POST',
-                              headers: {
-                                'Authorization': `Bearer ${token}`
-                              }
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                              const defaultPassword = account.role === 'admin' ? 'admin123' : (account.role === 'pmo' ? 'pmopassword' : 'userpassword');
-                              setSuccess(`Password has been reset to "${defaultPassword}"`);
-                              setTimeout(onClose, 1500);
-                            } else if (!handleTokenError(data.message)) {
-                              setError(data.message || 'Failed to reset password.');
-                            }
-                          } catch (err) {
-                            setError('Failed to reset password.');
-                          }
-                          setResetting(false);
-                          setShowResetConfirm(false);
-                        }}
-                      >Reset Password</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Message container at the bottom */}
-          {(error || success) && (
-            <div className="mt-4 mb-2">
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-medium transition-colors"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium transition-colors"
+              >
+                Save Changes
+              </button>
               {error && (
-                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md animate-fadeIn">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-red-700">{error}</p>
-                    </div>
-                  </div>
+                <div className="ml-4 bg-red-50 border-l-4 border-red-500 p-3 rounded-md text-red-700 font-medium animate-fadeIn flex items-center">
+                  {error}
+                  <button onClick={() => setError("")} className="ml-2 text-red-700 hover:text-red-900 font-bold">&times;</button>
                 </div>
               )}
-              {success && (
-                <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-md animate-fadeIn">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-green-700">{success}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            </>
           )}
-          
-          {/* Only show buttons if there is NO success message */}
-          {!success && (
-            <div className="flex justify-end gap-2 mt-4">
-              <button type="button" className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 transition-colors" onClick={onClose}>Cancel</button>
-              <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors">Save</button>
-            </div>
-          )}
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
+  </div>
   );
 }

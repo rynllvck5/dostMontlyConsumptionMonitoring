@@ -43,10 +43,15 @@ const upload = multer({
   }
 });
 
-// Get all items
+// Get all items (exclude archived by default, only from same office)
 router.get('/', authenticateJWT, async (req, res) => {
   try {
-    const { search, sortBy, sortOrder, period } = req.query;
+    const { search, sortBy, sortOrder, item_model, showArchived } = req.query;
+    // Get the logged-in user's office_id
+    const userRes = await pool.query('SELECT office_id FROM users WHERE id = $1', [req.user.id]);
+    if (!userRes.rows.length) return res.status(403).json({ error: 'Forbidden: user not found' });
+    const officeId = userRes.rows[0].office_id;
+
     let query = `
       SELECT 
         i.*,
@@ -57,21 +62,30 @@ router.get('/', authenticateJWT, async (req, res) => {
         ) as images
       FROM consumption_items i 
       LEFT JOIN item_images im ON i.id = im.item_id
+      JOIN users u ON i.user_id = u.id
     `;
     
-    const conditions = [];
-    const params = [];
-    let paramCount = 1;
+    const conditions = ['u.office_id = $1'];
+    const params = [officeId];
+    let paramCount = 2;
 
-    if (search) {
+    // Exclude items with quantity = 0 unless explicitly showing archived
+    if (!showArchived || showArchived === 'false') {
+      conditions.push(`i.quantity > 0`);
+    }
+
+    // Fix: Use OR if both search and item_model are provided
+    if (search && item_model) {
+      conditions.push(`(i.item_name ILIKE $${paramCount} OR i.item_model ILIKE $${paramCount + 1})`);
+      params.push(`%${search}%`, `%${item_model}%`);
+      paramCount += 2;
+    } else if (search) {
       conditions.push(`i.item_name ILIKE $${paramCount}`);
       params.push(`%${search}%`);
       paramCount++;
-    }
-
-    if (period) {
-      conditions.push(`i.period = $${paramCount}`);
-      params.push(period);
+    } else if (item_model) {
+      conditions.push(`i.item_model ILIKE $${paramCount}`);
+      params.push(`%${item_model}%`);
       paramCount++;
     }
     
@@ -110,16 +124,16 @@ router.post('/', authenticateJWT, upload.array('images', 10), async (req, res) =
   try {
     await client.query('BEGIN');
     
-    const { item_name, kilowatts, quantity, period } = req.body;
+    const { item_name, kilowatts, quantity, item_model } = req.body;
     
-    if (!item_name || !kilowatts || !quantity || !period) {
+    if (!item_name || !kilowatts || !quantity) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     // Insert item
     const { rows: [item] } = await client.query(
-      'INSERT INTO consumption_items (item_name, kilowatts, quantity, period, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [item_name, kilowatts, quantity, period, req.user.id]
+      'INSERT INTO consumption_items (item_name, kilowatts, quantity, item_model, user_id, updated_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *',
+      [item_name, kilowatts, quantity, item_model || null, req.user.id]
     );
 
     // Insert images if any
@@ -167,16 +181,30 @@ router.put('/:id', authenticateJWT, upload.array('images', 10), async (req, res)
   try {
     await client.query('BEGIN');
     
-    const { item_name, kilowatts, quantity, period } = req.body;
+    const { item_name, kilowatts, quantity, item_model } = req.body;
     
-    if (!item_name || !kilowatts || !quantity || !period) {
+    if (!item_name || !kilowatts || !quantity) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     // Update item
+    // Check if the item belongs to the same office as the logged-in user
+    const userRes = await client.query('SELECT office_id FROM users WHERE id = $1', [req.user.id]);
+    if (!userRes.rows.length) throw new Error('User not found');
+    const officeId = userRes.rows[0].office_id;
+    const itemRes = await client.query(
+      `SELECT i.id FROM consumption_items i
+       JOIN users u ON i.user_id = u.id
+       WHERE i.id = $1 AND u.office_id = $2`,
+      [req.params.id, officeId]
+    );
+    if (!itemRes.rows.length) {
+      throw new Error('Item not found or unauthorized');
+    }
+    // Proceed with update
     const { rows: [item] } = await client.query(
-      'UPDATE consumption_items SET item_name = $1, kilowatts = $2, quantity = $3, period = $4 WHERE id = $5 AND user_id = $6 RETURNING *',
-      [item_name, kilowatts, quantity, period, req.params.id, req.user.id]
+      'UPDATE consumption_items SET item_name = $1, kilowatts = $2, quantity = $3, item_model = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
+      [item_name, kilowatts, quantity, item_model || null, req.params.id]
     );
 
     if (!item) {
@@ -280,36 +308,119 @@ router.put('/:id', authenticateJWT, upload.array('images', 10), async (req, res)
   }
 });
 
-// Delete item
-router.delete('/:id', authenticateJWT, async (req, res) => {
+// Archive item (replace delete)
+router.patch('/:id/archive', authenticateJWT, async (req, res) => {
+  console.log('[ARCHIVE ROUTE HIT]', 'id:', req.params.id, 'user:', req.user?.id);
   const client = await pool.connect();
-  
   try {
     await client.query('BEGIN');
-    
-    // Get images to delete
-    const { rows: images } = await client.query(
-      'SELECT filename FROM item_images WHERE item_id = $1',
-      [req.params.id]
+    // Get the logged-in user's office_id
+    const userRes = await client.query('SELECT office_id FROM users WHERE id = $1', [req.user.id]);
+    if (!userRes.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Forbidden: user not found' });
+    }
+    const officeId = userRes.rows[0].office_id;
+    // Check if the item belongs to the same office
+    const itemRes = await client.query(
+      `SELECT i.id FROM consumption_items i
+       JOIN users u ON i.user_id = u.id
+       WHERE i.id = $1 AND u.office_id = $2`,
+      [req.params.id, officeId]
     );
-    
-    // Delete image files
-    images.forEach(image => {
-      const filePath = path.join(__dirname, '../../frontend/public/images/item-uploads', image.filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    });
-    
-    // Delete from database
-    await client.query('DELETE FROM consumption_items WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
-    
+    if (!itemRes.rows.length) {
+      await client.query('ROLLBACK');
+      console.log('[ARCHIVE ERROR] Item not found or not authorized (office mismatch)');
+      return res.status(404).json({ error: 'Item not found or not authorized' });
+    }
+        // Get quantity to archive from request
+    const quantityToArchive = parseInt(req.body.quantity, 10);
+    const itemInfoRes = await client.query('SELECT quantity, archived_quantity FROM consumption_items WHERE id = $1', [req.params.id]);
+    if (!itemInfoRes.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    const { quantity, archived_quantity } = itemInfoRes.rows[0];
+    if (!quantityToArchive || quantityToArchive < 1) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Invalid archive quantity' });
+    }
+    if (quantityToArchive > quantity) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Cannot archive more than available quantity' });
+    }
+    // Update the item: subtract from quantity, add to archived_quantity
+    const newQuantity = quantity - quantityToArchive;
+    const newArchivedQuantity = (archived_quantity || 0) + quantityToArchive;
+    const { rowCount } = await client.query(
+      'UPDATE consumption_items SET quantity = $1, archived_quantity = $2 WHERE id = $3',
+      [newQuantity, newArchivedQuantity, req.params.id]
+    );
+    console.log('[ARCHIVE QUERY] rowCount:', rowCount, 'newQuantity:', newQuantity, 'archivedQuantity:', newArchivedQuantity);
     await client.query('COMMIT');
-    res.json({ message: 'Item deleted successfully' });
+    res.json({ message: 'Item archived successfully', newQuantity, archivedQuantity: newArchivedQuantity });
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error(err);
-    res.status(500).json({ error: 'Failed to delete item' });
+    console.error('[ARCHIVE CATCH]', err);
+    res.status(500).json({ error: 'Failed to archive item' });
+  } finally {
+    client.release();
+  }
+});
+
+// Restore archived quantity to active quantity
+router.patch('/:id/restore', authenticateJWT, async (req, res) => {
+  console.log('[RESTORE ROUTE HIT]', 'id:', req.params.id, 'user:', req.user?.id);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Get the logged-in user's office_id
+    const userRes = await client.query('SELECT office_id FROM users WHERE id = $1', [req.user.id]);
+    if (!userRes.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Forbidden: user not found' });
+    }
+    const officeId = userRes.rows[0].office_id;
+    // Check if the item belongs to the same office
+    const itemRes = await client.query(
+      `SELECT i.id FROM consumption_items i
+       JOIN users u ON i.user_id = u.id
+       WHERE i.id = $1 AND u.office_id = $2`,
+      [req.params.id, officeId]
+    );
+    if (!itemRes.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Item not found or not authorized' });
+    }
+    // Get current archived_quantity and quantity
+    const itemInfoRes = await client.query('SELECT quantity, archived_quantity FROM consumption_items WHERE id = $1', [req.params.id]);
+    if (!itemInfoRes.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    const { quantity, archived_quantity } = itemInfoRes.rows[0];
+    const quantityToRestore = parseInt(req.body.quantity, 10);
+    if (!quantityToRestore || quantityToRestore < 1) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Invalid restore quantity' });
+    }
+    if (quantityToRestore > archived_quantity) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Cannot restore more than archived quantity' });
+    }
+    // Update the item: subtract from archived_quantity, add to quantity
+    const newQuantity = quantity + quantityToRestore;
+    const newArchivedQuantity = archived_quantity - quantityToRestore;
+    const { rowCount } = await client.query(
+      'UPDATE consumption_items SET quantity = $1, archived_quantity = $2 WHERE id = $3',
+      [newQuantity, newArchivedQuantity, req.params.id]
+    );
+    await client.query('COMMIT');
+    res.json({ message: 'Item restored successfully', newQuantity, archivedQuantity: newArchivedQuantity });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[RESTORE CATCH]', err);
+    res.status(500).json({ error: 'Failed to restore item' });
   } finally {
     client.release();
   }

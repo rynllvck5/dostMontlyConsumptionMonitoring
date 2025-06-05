@@ -1,5 +1,6 @@
 import React from "react";
 import { NavLink, useLocation } from 'react-router-dom';
+import Settings from './Settings/Settings';
 
 // Sidebar is sticky and styled for modern dashboard look
 const SidebarCloseButton = ({ onClick }) => (
@@ -44,10 +45,10 @@ export default function Sidebar({ role, fullName, open = true, onClose, onLogout
         ${open ? 'w-64 px-4' : 'w-20 px-2'}
         md:translate-x-0 md:opacity-100 md:pointer-events-auto`
       }
-      style={{ transition: 'width 0.3s, padding 0.3s' }}
+      style={{ transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1), padding 0.3s cubic-bezier(0.4,0,0.2,1)' }}
     >
       {/* Top row: logo, title, close/open button */}
-      {/* Absolute close/open button at top-right */}
+      {/* Absolute toggle button at top-right for both open and closed states */}
       {open ? (
         <button
           className="absolute top-2 right-2 flex items-center justify-center w-10 h-10 rounded-full hover:bg-blue-700 focus:outline-none transition-all duration-200 z-10"
@@ -59,17 +60,15 @@ export default function Sidebar({ role, fullName, open = true, onClose, onLogout
           </svg>
         </button>
       ) : (
-        <div className="flex justify-center w-full absolute top-2 left-0">
-          <button
-            className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-blue-700 focus:outline-none transition-all duration-200 z-10"
-            onClick={() => onClose(false)}
-            aria-label="Open sidebar"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        </div>
+        <button
+          className="absolute top-2 left-1/2 transform -translate-x-1/2 flex items-center justify-center w-10 h-10 rounded-full hover:bg-blue-700 focus:outline-none transition-all duration-200 z-10"
+          onClick={onClose}
+          aria-label="Open sidebar"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
       )}
       {/* Logo and 2-line text row below the close button */}
       <div className="relative flex items-center w-full min-w-0 mt-10 mb-10 px-2 gap-3" style={{height: '40px'}}>
@@ -154,6 +153,7 @@ export default function Sidebar({ role, fullName, open = true, onClose, onLogout
                  <img src="/images/item-inventory.svg" alt="Item Inventory" className="h-6 w-6" />
                  <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Item Inventory</span>
                </NavLink>
+
              </>
            )}
 
@@ -192,14 +192,19 @@ export default function Sidebar({ role, fullName, open = true, onClose, onLogout
         </nav>
         {/* Profile button above logout at the very bottom */}
         <div className="mt-auto flex flex-col gap-3 pt-8">
-          <NavLink
-              to={`/${role}/profile`}
+          {/* Profile button removed */}
+          {/* Settings for PMO, below Profile but above Logout */}
+          {role === 'pmo' && (
+            <NavLink
+              to={`/${role}/settings`}
               className={({ isActive }) => `flex items-center gap-3 w-full text-left px-4 py-2 rounded transition-colors ${isActive ? 'bg-blue-800' : 'hover:bg-blue-700'} ${open ? '' : 'justify-center items-center'}`}
-              title="Profile"
+              title="Settings"
             >
-              <img src="/images/profile.svg" alt="Profile" className="h-6 w-6" />
-              <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Profile</span>
+              <img src="/images/settings.svg" alt="Settings" className="h-6 w-6" onError={(e) => { e.target.onerror = null; e.target.src = '/images/item-inventory.svg'; }} />
+              <span className={`text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${open ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'}`}>Settings</span>
             </NavLink>
+          )}
+
           {onLogout && (
             <button
               className={`flex items-center gap-3 w-full text-left px-4 py-2 rounded transition-colors font-semibold hover:bg-red-700 ${open ? '' : 'justify-center items-center'}`}

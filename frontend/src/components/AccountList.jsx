@@ -26,10 +26,10 @@ function ViewAccountModal({ account, onClose }) {
         <div className="flex flex-col items-center mb-6">
           <div className="relative mb-4">
             <img 
-              src={account.profile_picture ? `/images/${account.profile_picture}` : '/images/default-profile.jpg'} 
+              src={account.profile_picture ? `/images/uploaded-profile-pics/${account.profile_picture}` : '/images/uploaded-profile-pics/default-profile.jpg'} 
               alt={account.email}
               className="w-24 h-24 rounded-full object-cover border-2 border-blue-500"
-              onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
+              onError={(e) => { e.target.src = '/images/uploaded-profile-pics/default-profile.jpg'; }}
             />
             <div className="absolute bottom-0 right-0 bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
               {account.role}
@@ -42,9 +42,9 @@ function ViewAccountModal({ account, onClose }) {
               'No name set'}
           </p>
           <p className="text-gray-600 mt-1">
-            {account.office_unit && account.office_unit.trim() !== '' ? 
-              account.office_unit : 
-              'No office/unit set'}
+            {account.office_name && account.office_name.trim() !== '' ? 
+              account.office_name : 
+              'No office set'}
           </p>
         </div>
         
@@ -68,8 +68,8 @@ function ViewAccountModal({ account, onClose }) {
               <p className="text-sm font-medium">{account.last_name || 'Not set'}</p>
             </div>
             <div className="col-span-2">
-              <p className="text-xs text-gray-500">Office/Unit</p>
-              <p className="text-sm font-medium">{account.office_unit && account.office_unit.trim() !== '' ? account.office_unit : 'Not set'}</p>
+              <p className="text-xs text-gray-500">Office</p>
+              <p className="text-sm font-medium">{account.office_name && account.office_name.trim() !== '' ? account.office_name : 'Not set'}</p>
             </div>
           </div>
         </div>
@@ -94,7 +94,9 @@ export default function AccountList({ role, token, onCreateClick }) {
   const [filteredAccounts, setFilteredAccounts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [editAccount, setEditAccount] = useState(null);
+  const [editAccountId, setEditAccountId] = useState(null);
+const [editAccountDetails, setEditAccountDetails] = useState(null);
+const [editLoading, setEditLoading] = useState(false);
   const [viewAccount, setViewAccount] = useState(null);
   const [deleteAccount, setDeleteAccount] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -117,11 +119,12 @@ export default function AccountList({ role, token, onCreateClick }) {
       const data = await res.json();
       console.log('Fetched accounts:', data);
       
-      // Add detailed debugging for office/unit field
+      // Add detailed debugging for office fields
       if (Array.isArray(data) && data.length > 0) {
         console.log('First account data:', data[0]);
-        console.log('Office/Unit value type:', typeof data[0].office_unit);
-        console.log('Office/Unit value:', data[0].office_unit);
+        console.log('Office ID type:', typeof data[0].office_id);
+        console.log('Office ID value:', data[0].office_id);
+        console.log('Office Name:', data[0].office_name);
       }
       
       const accountsList = Array.isArray(data) ? data : [];
@@ -298,7 +301,7 @@ export default function AccountList({ role, token, onCreateClick }) {
                   <th scope="col" className="w-16 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
                   <th scope="col" className="w-1/5 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                   <th scope="col" className="w-1/5 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th scope="col" className="w-1/4 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Office/Unit</th>
+                  <th scope="col" className="w-1/4 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Office</th>
                   <th scope="col" className="w-28 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -307,10 +310,10 @@ export default function AccountList({ role, token, onCreateClick }) {
                   <tr key={acc.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors duration-150`}>
                     <td className="px-3 py-3 whitespace-nowrap text-center">
                         <img 
-                          src={acc.profile_picture ? `/images/${acc.profile_picture}` : '/images/default-profile.jpg'} 
+                          src={acc.profile_picture ? `/images/uploaded-profile-pics/${acc.profile_picture}` : '/images/uploaded-profile-pics/default-profile.jpg'} 
                           alt={acc.email}
                           className="w-10 h-10 rounded-full object-cover inline-block"
-                          onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
+                          onError={(e) => { e.target.src = '/images/uploaded-profile-pics/default-profile.jpg'; }}
                         />
                     </td>
                     <td className="px-3 py-3 text-center">
@@ -325,8 +328,8 @@ export default function AccountList({ role, token, onCreateClick }) {
                     </td>
                     <td className="px-3 py-3 text-center">
                       <div className="text-sm text-gray-900 truncate mx-auto max-w-full">
-                        {acc.office_unit && acc.office_unit.trim() !== '' ? 
-                          acc.office_unit : 
+                        {acc.office_name && acc.office_name.trim() !== '' ? 
+                          acc.office_name : 
                           <span className="text-gray-400">Not set</span>}
                       </div>
                     </td>
@@ -343,10 +346,28 @@ export default function AccountList({ role, token, onCreateClick }) {
                           </svg>
                         </button>
                         <button 
-                          className="p-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors" 
-                          onClick={() => setEditAccount(acc)}
-                          title="Edit account"
-                        >
+                           className="p-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors" 
+                           onClick={async () => {
+                             setEditAccountId(acc.id);
+                             setEditAccountDetails(null);
+                             setEditLoading(true);
+                             try {
+                               const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+                               const currentToken = localStorage.getItem('token');
+                               // Plural endpoint, REST convention
+                               const res = await fetch(`${API_URL}/accounts/${acc.id}`, {
+                                 headers: { 'Authorization': `Bearer ${currentToken}` }
+                               });
+                               if (!res.ok) throw new Error('Not found');
+                               const data = await res.json();
+                               setEditAccountDetails(data);
+                             } catch (err) {
+                               setEditAccountDetails({ error: 'Failed to load account details.' });
+                             }
+                             setEditLoading(false);
+                           }}
+                           title="Edit account"
+                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
@@ -390,16 +411,15 @@ export default function AccountList({ role, token, onCreateClick }) {
               </div>
               <h3 className="text-lg font-semibold text-gray-900">Delete Account</h3>
             </div>
-            
             <div className="mb-6">
               <p className="text-gray-700 mb-2">Are you sure you want to delete this account?</p>
               <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
                 <div className="flex items-center">
                   <img 
-                    src={deleteAccount.profile_picture ? `/images/${deleteAccount.profile_picture}` : '/images/default-profile.jpg'} 
+                    src={deleteAccount.profile_picture ? `/images/uploaded-profile-pics/${deleteAccount.profile_picture}` : '/images/uploaded-profile-pics/default-profile.jpg'} 
                     alt={deleteAccount.email}
                     className="w-10 h-10 rounded-full object-cover mr-3"
-                    onError={(e) => { e.target.src = '/images/default-profile.jpg'; }}
+                    onError={(e) => { e.target.src = '/images/uploaded-profile-pics/default-profile.jpg'; }}
                   />
                   <div>
                     <p className="font-medium">{deleteAccount.email}</p>
@@ -484,13 +504,38 @@ export default function AccountList({ role, token, onCreateClick }) {
         </div>
       )}
 
-      {editAccount && (
-        <EditAccountModal
-          account={editAccount}
-          token={token}
-          editorRole={userRole} // Pass the currently logged-in user's role
-          onClose={() => { setEditAccount(null); fetchAccounts(); }}
-        />
+      {editAccountId && (
+        editLoading ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg shadow-lg p-8 flex flex-col items-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500 mb-4"></div>
+              <div className="text-gray-700 font-medium">Loading account details...</div>
+            </div>
+          </div>
+        ) : editAccountDetails && !editAccountDetails.error ? (
+          <EditAccountModal
+            account={editAccountDetails}
+            token={token}
+            editorRole={userRole}
+            onClose={() => {
+              setEditAccountId(null);
+              setEditAccountDetails(null);
+              setEditLoading(false);
+              fetchAccounts();
+            }}
+          />
+        ) : editAccountDetails && editAccountDetails.error ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg shadow-lg p-8 flex flex-col items-center">
+              <div className="text-red-600 font-semibold text-lg mb-2">{editAccountDetails.error}</div>
+              <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded" onClick={() => {
+                setEditAccountId(null);
+                setEditAccountDetails(null);
+                setEditLoading(false);
+              }}>Close</button>
+            </div>
+          </div>
+        ) : null
       )}
       {/* CreateUserModal for adding Admin/PMO */}
       {showCreateModal && (

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { uploadElectricityData } from "../api";
 
-export default function ElectricityUploadModal({ open, onClose }) {
+export default function ElectricityUploadModal({ open, onClose, onUploadSuccess }) {
   const [month, setMonth] = useState('');
   const [baseline, setBaseline] = useState('');
   const [consumption, setConsumption] = useState('');
@@ -12,6 +12,64 @@ export default function ElectricityUploadModal({ open, onClose }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [errors, setErrors] = useState({});
   const fileInputRef = useRef();
+
+  // Office details state
+  const [officeFields, setOfficeFields] = useState({
+    building_description: '',
+    gross_area: '',
+    air_conditioned_area: '',
+    number_of_occupants: '',
+    office_account_no: '',
+    office_address: ''
+  });
+  const [officeLoading, setOfficeLoading] = useState(false);
+  const [officeError, setOfficeError] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    // Fetch user's office details when modal opens
+    async function fetchOfficeFields() {
+      setOfficeLoading(true);
+      setOfficeError('');
+      try {
+        const token = localStorage.getItem('token');
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
+        // Get user profile to get office_id
+        const resProfile = await fetch(`${API_URL}/profile`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resProfile.ok) throw new Error('Failed to fetch user profile.');
+        const profile = await resProfile.json();
+        if (!profile.office_id) throw new Error('No office assigned to your account.');
+        // Get office details
+        const resOffice = await fetch(`/api/offices/${profile.office_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resOffice.ok) throw new Error('Failed to fetch office details.');
+        const office = await resOffice.json();
+        setOfficeFields({
+          building_description: office.building_description || '',
+          gross_area: office.gross_area || '',
+          air_conditioned_area: office.air_conditioned_area || '',
+          number_of_occupants: office.number_of_occupants || '',
+          office_account_no: office.office_account_no || '',
+          office_address: office.office_address || ''
+        });
+      } catch (err) {
+        setOfficeError(err.message || 'Could not load office details.');
+        setOfficeFields({
+          building_description: '',
+          gross_area: '',
+          air_conditioned_area: '',
+          number_of_occupants: '',
+          office_account_no: '',
+          office_address: ''
+        });
+      }
+      setOfficeLoading(false);
+    }
+    fetchOfficeFields();
+  }, [open]);
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -146,6 +204,10 @@ export default function ElectricityUploadModal({ open, onClose }) {
     files.forEach((file) => {
       formData.append('attachments', file);
     });
+    // Append office fields
+    Object.entries(officeFields).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
 
     try {
       const token = localStorage.getItem("token");
@@ -159,7 +221,11 @@ export default function ElectricityUploadModal({ open, onClose }) {
             setMessage("Updated successfully!");
             setTimeout(() => {
               setMessage('');
-              handleClose();
+              if (typeof onUploadSuccess === 'function') {
+                onUploadSuccess();
+              } else {
+                handleClose();
+              }
             }, 1000);
           } else {
             setMessage(data.message || "Error updating data");
@@ -169,7 +235,11 @@ export default function ElectricityUploadModal({ open, onClose }) {
         setMessage("Saved successfully!");
         setTimeout(() => {
           setMessage('');
-          handleClose();
+          if (typeof onUploadSuccess === 'function') {
+            onUploadSuccess();
+          } else {
+            handleClose();
+          }
         }, 1000);
       } else {
         setMessage(data.message || "Error saving data");
@@ -189,7 +259,19 @@ export default function ElectricityUploadModal({ open, onClose }) {
         <h3 className="text-xl font-bold mb-6 text-blue-900 sticky top-0 bg-white pt-2 z-10">
           Upload Monthly Electricity Consumption
         </h3>
+        {officeLoading && (
+          <div className="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md animate-fadeIn text-blue-900">
+            Loading office details...
+          </div>
+        )}
+        {officeError && (
+          <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-md animate-fadeIn text-red-900">
+            {officeError}
+          </div>
+        )}
         <form onSubmit={handleSave} autoComplete="off">
+
+
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
             <select

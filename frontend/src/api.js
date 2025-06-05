@@ -36,12 +36,14 @@ export async function updateConsumptionItem({ id, item_name, kilowatts, token })
   return res.json();
 }
 
-export async function deleteConsumptionItem({ id, token }) {
-  const res = await fetch(`${ITEMS_URL}/${id}`, {
-    method: 'DELETE',
+export async function archiveConsumptionItem({ id, token, quantity }) {
+  const res = await fetch(`${ITEMS_URL}/${id}/archive`, {
+    method: 'PATCH',
     headers: {
-      'Authorization': `Bearer ${token}`
-    }
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ quantity }),
   });
   return res.json();
 }
@@ -55,17 +57,25 @@ export async function login(email, password) {
   return res.json();
 }
 
-export async function signup({ email, password, first_name, last_name, profile_picture, office_unit }) {
+export async function signup({ email, password, first_name, last_name, profile_picture, office_id }) {
   const res = await fetch(`${API_URL}/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, first_name, last_name, profile_picture, office_unit }),
+    body: JSON.stringify({ email, password, first_name, last_name, profile_picture, office_id }),
   });
   return res.json();
 }
 
 // Username check removed: now using email as identifier.
 // If needed, implement checkEmailExists instead.
+
+// Fetch all offices for dropdowns
+export async function fetchOffices(token) {
+  const res = await fetch(`${API_URL}/offices`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  return res.json();
+}
 
 export async function checkEmailExists(email, role) {
   const res = await fetch(
@@ -78,6 +88,14 @@ export async function checkEmailExists(email, role) {
 
 // Upload monthly electricity consumption data (from DOSTResourceMonitoringLEGIT)
 const ELECTRICITY_API_URL = 'http://localhost:5000/api/electricity';
+
+// Fetch all electricity consumption records for reporting
+export async function fetchElectricityConsumption(token) {
+  const res = await fetch(ELECTRICITY_API_URL, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  return res.json();
+}
 export async function uploadElectricityData(formData, token) {
   const res = await fetch(ELECTRICITY_API_URL, {
     method: 'POST',
@@ -89,14 +107,14 @@ export async function uploadElectricityData(formData, token) {
   return res.json();
 }
 
-export async function createUser({ email, password, role, token, first_name, last_name, profile_picture, office_unit }) {
+export async function createUser({ email, password, role, token, first_name, last_name, profile_picture, office_id }) {
   const res = await fetch(`${API_URL}/create-user`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ email, password, role, first_name, last_name, profile_picture, office_unit }),
+    body: JSON.stringify({ email, password, role, first_name, last_name, profile_picture, office_id }),
   });
   return res.json();
 }
