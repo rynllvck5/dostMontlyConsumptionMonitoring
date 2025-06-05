@@ -61,6 +61,9 @@
 - Improved: Error logging for file uploads and authentication
 - Security: Prevented unauthorized requests for account lists
 
+
+5. Drop your current database and import the database.sql uploaded.
+
 ---
 
 ## Version 2.0.0 (May 30, 2025)
