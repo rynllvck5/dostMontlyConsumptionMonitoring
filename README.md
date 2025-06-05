@@ -1,5 +1,33 @@
 # DOST Monthly Consumption Monitoring System
 
+## Version 3.0.0 (June 5, 2025)
+
+**Release Highlights:**
+- This is a major new release. The changelog for this version is not compared to 2.0.1 by user request.
+- Please refer to your project management notes or commit history for specific changes.
+
+**Upgrade Guide (from v2.0.1 to v3.0.0):**
+1. Pull the latest code from the repository:
+   ```
+   git pull origin main
+   git checkout v3.0.0
+   ```
+2. Update dependencies as needed:
+   ```
+   cd backend
+   npm install
+   cd ../frontend
+   npm install
+   ```
+3. If there are any database migration scripts provided in this release, apply them as described in your backend's documentation.
+4. Restart both backend and frontend servers as usual.
+5. Review the system for any new features or changes.
+
+**Changelog:**
+- The changelog for version 3.0.0 is not included by request. Please consult your commit history or project notes for details.
+
+---
+
 ## Version 2.0.1 (June 2, 2025)
 
 **Release Highlights:**
